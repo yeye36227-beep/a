@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>교수 상세 - 다이어그램 탭</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 40px;
+    background: #F8FAFC;
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+
+  /* 탭 */
+  .tabs {
+    display: flex;
+    gap: 36px;
+    border-bottom: 1px solid #E5E7EB;
+    margin-bottom: 28px;
+  }
+  .tab {
+    position: relative;
+    padding: 14px 2px 16px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #9CA3AF;
+    cursor: pointer;
+  }
+  .tab.active {
+    color: #4F46E5;
+    font-weight: 700;
+  }
+  .tab.active::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: -1px;
+    height: 3px;
+    background: #4F46E5;
+    border-radius: 2px 2px 0 0;
+  }
+
+  /* 카드 레이아웃 */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 24px;
+  }
+  .card {
+    background: #FFFFFF;
+    border: 1px solid #F0F1F3;
+    border-radius: 16px;
+    padding: 28px;
+  }
+  .card h2 {
+    margin: 0 0 24px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  /* 다이어그램(레이더) 카드 */
+  .chart-area {
+    margin: 8px auto 0;
+    max-width: 420px;
+  }
+  .chart-area svg { display: block; width: 100%; height: auto; }
+  .axis-label { font-size: 13px; font-weight: 700; fill: #111827; }
+  .tick-label { font-size: 11px; fill: #9CA3AF; }
+  .legend {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+  }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; background: #4F46E5; }
+
+  /* 항목별 점수 카드 */
+  .score-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+  .score-label {
+    width: 92px;
+    flex-shrink: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+  }
+  .bar-track {
+    flex: 1;
+    height: 10px;
+    background: #E5E7EB;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: #4F46E5;
+    border-radius: 999px;
+  }
+  .score-value {
+    width: 40px;
+    text-align: right;
+    font-size: 15px;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px dashed #E5E7EB;
+    margin: 40px 0 16px;
+  }
+  .summary {
+    text-align: right;
+    font-size: 14px;
+    color: #6B7280;
+  }
+  .summary b {
+    color: #4F46E5;
+    font-size: 16px;
+    font-weight: 800;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="tabs">
+    <div class="tab">태그 요약</div>
+    <div class="tab">리뷰</div>
+    <div class="tab active">다이어그램</div>
+  </div>
+
+  <div class="grid">
+
+    <!-- 왼쪽: 다이어그램 -->
+    <div class="card">
+      <h2>교수 평가 다이어그램</h2>
+
+      <div class="chart-area">
+        <svg id="radar" viewBox="0 0 460 440"></svg>
+      </div>
+      <div class="legend">
+        <span class="legend-dot"></span>
+        <span>이해쑥 교수님 평균</span>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 항목별 점수 -->
+    <div class="card">
+      <h2>항목별 점수</h2>
+
+      <div class="score-row">
+        <div class="score-label">난이도</div>
+        <div class="bar-track"><div class="bar-fill" style="width:60%"></div></div>
+        <div class="score-value">3.0</div>
+      </div>
+      <div class="score-row">
+        <div class="score-label">과제량</div>
+        <div class="bar-track"><div class="bar-fill" style="width:80%"></div></div>
+        <div class="score-value">4.0</div>
+      </div>
+      <div class="score-row">
+        <div class="score-label">시험 범위 명확성</div>
+        <div class="bar-track"><div class="bar-fill" style="width:96%"></div></div>
+        <div class="score-value">4.8</div>
+      </div>
+      <div class="score-row">
+        <div class="score-label">피드백 속도</div>
+        <div class="bar-track"><div class="bar-fill" style="width:86%"></div></div>
+        <div class="score-value">4.3</div>
+      </div>
+      <div class="score-row">
+        <div class="score-label">수업 태도</div>
+        <div class="bar-track"><div class="bar-fill" style="width:100%"></div></div>
+        <div class="score-value">5.0</div>
+      </div>
+
+      <hr class="divider">
+      <div class="summary">종합 평균 <b>3.8 / 5.0</b></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const cx = 230, cy = 205, maxR = 130, levels = 5;
+  const axes = ["난이도", "과제량", "시험 범위 명확성", "피드백 속도", "수업 태도"];
+  const values = [3, 4, 4.8, 4.3, 5]; // 5점 만점
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById("radar");
+
+  const pointFor = (i, r) => {
+    const a = -Math.PI / 2 + i * (2 * Math.PI / axes.length);
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  };
+  const toStr = pts => pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+
+  for (let lvl = 1; lvl <= levels; lvl++) {
+    const r = (maxR / levels) * lvl;
+    const poly = document.createElementNS(svgNS, "polygon");
+    poly.setAttribute("points", toStr(axes.map((_, i) => pointFor(i, r))));
+    poly.setAttribute("fill", "none");
+    poly.setAttribute("stroke", "#EEF0F3");
+    poly.setAttribute("stroke-width", "1");
+    svg.appendChild(poly);
+
+    const tick = document.createElementNS(svgNS, "text");
+    tick.setAttribute("x", cx + 7);
+    tick.setAttribute("y", cy - r + 4);
+    tick.setAttribute("class", "tick-label");
+    tick.textContent = lvl;
+    svg.appendChild(tick);
+  }
+
+  axes.forEach((_, i) => {
+    const p = pointFor(i, maxR);
+    const line = document.createElementNS(svgNS, "line");
+    line.setAttribute("x1", cx); line.setAttribute("y1", cy);
+    line.setAttribute("x2", p.x); line.setAttribute("y2", p.y);
+    line.setAttribute("stroke", "#EEF0F3");
+    line.setAttribute("stroke-width", "1");
+    svg.appendChild(line);
+  });
+
+  const dataPts = axes.map((_, i) => pointFor(i, (maxR / levels) * values[i]));
+  const dataPoly = document.createElementNS(svgNS, "polygon");
+  dataPoly.setAttribute("points", toStr(dataPts));
+  dataPoly.setAttribute("fill", "rgba(79,70,229,0.16)");
+  dataPoly.setAttribute("stroke", "#4F46E5");
+  dataPoly.setAttribute("stroke-width", "3");
+  dataPoly.setAttribute("stroke-linejoin", "round");
+  svg.appendChild(dataPoly);
+
+  dataPts.forEach(p => {
+    const dot = document.createElementNS(svgNS, "circle");
+    dot.setAttribute("cx", p.x); dot.setAttribute("cy", p.y);
+    dot.setAttribute("r", 6);
+    dot.setAttribute("fill", "#4F46E5");
+    dot.setAttribute("stroke", "#FFFFFF");
+    dot.setAttribute("stroke-width", "2");
+    svg.appendChild(dot);
+  });
+
+  axes.forEach((label, i) => {
+    const p = pointFor(i, maxR + 34);
+    const text = document.createElementNS(svgNS, "text");
+    text.setAttribute("x", p.x); text.setAttribute("y", p.y);
+    text.setAttribute("class", "axis-label");
+    text.setAttribute("text-anchor", Math.abs(p.x - cx) < 20 ? "middle" : (p.x > cx ? "start" : "end"));
+    text.setAttribute("dominant-baseline", "middle");
+    text.textContent = label;
+    svg.appendChild(text);
+  });
+</script>
+
+</body>
+</html>

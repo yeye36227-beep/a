@@ -1,0 +1,47 @@
+services:
+  # 1) 프론트엔드 (정적 사이트, nginx)
+  web:
+    build: .
+    ports:
+      - "8080:80" # 브라우저에서 http://localhost:8080
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  # 2) 백엔드 (Spring Boot, 팀원 이미지)
+  backend:
+    image: jaewon9804/likelion-mini-project:latest
+    ports:
+      - "8081:8080" # 브라우저에서 http://localhost:8081 (API_BASE)
+    environment:
+      # JWT 비밀키 (32자 이상 필요)
+      JWT_SECRET: "ThisIsAVeryLongJwtSecretKey1234567890abcd"
+      # DB 연결 — 같은 compose 안 'db' 서비스 이름으로 접속
+      SPRING_DATASOURCE_URL: "jdbc:mysql://db:3306/likelion?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8"
+      SPRING_DATASOURCE_USERNAME: "root"
+      SPRING_DATASOURCE_PASSWORD: "rootpassword"
+      # 테이블 자동 생성/갱신 (빈 DB여도 스키마 생성)
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 3) 데이터베이스 (MySQL 8)
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: "rootpassword"
+      MYSQL_DATABASE: "likelion"
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql # 데이터 영속 저장(컨테이너 지워도 유지)
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  db_data:

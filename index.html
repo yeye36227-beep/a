@@ -13,8 +13,8 @@
     />
     <link rel="stylesheet" href="style.css" />
 
-    <!-- PWA 설정 -->
-    <link rel="manifest" href="manifest.json" />
+    <!-- PWA 설정 (manifest.json 파일이 없어 링크 비활성화 - 404 방지) -->
+    <!-- <link rel="manifest" href="manifest.json" /> -->
     <meta name="theme-color" content="#4c6ef5" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -53,8 +53,11 @@
 
           <nav class="menu-list">
             <div class="menu-section">둘러보기</div>
-            <button class="menu-item active" id="menu-home">
-              <span class="material-icons-outlined">home</span> 교수 검색
+            <button class="menu-item active" id="menu-dashboard">
+              <span class="material-icons-outlined">home</span> 홈
+            </button>
+            <button class="menu-item" id="menu-home">
+              <span class="material-icons-outlined">search</span> 교수 검색
             </button>
             <button class="menu-item" id="menu-jokbo">
               <span class="material-icons-outlined">receipt_long</span> 족보
@@ -103,8 +106,69 @@
 
       <!-- 메인 콘텐츠 영역 -->
       <main class="main-content">
+        <!-- [화면 0] 대시보드 홈 (기본 진입 화면) -->
+        <section id="view-dashboard" class="page-view">
+          <div class="dash-hero">
+            <div class="dash-hero-text">
+              <h1 id="dash-greeting">강의라운지에 오신 걸 환영해요 👋</h1>
+              <p>수강 전에 교수님 평가와 족보를 한눈에 확인하세요.</p>
+            </div>
+            <button class="dash-hero-btn" id="dash-go-search">
+              <span class="material-icons-outlined">search</span> 교수 검색하기
+            </button>
+          </div>
+
+          <div class="dash-stat-row" id="dash-stat-row">
+            <div class="dash-stat-card">
+              <span class="material-icons-outlined">monetization_on</span>
+              <div>
+                <div class="dash-stat-num" id="dash-stat-points">0P</div>
+                <div class="dash-stat-label">내 포인트</div>
+              </div>
+            </div>
+            <div class="dash-stat-card">
+              <span class="material-icons-outlined">bookmark</span>
+              <div>
+                <div class="dash-stat-num" id="dash-stat-bookmarks">0</div>
+                <div class="dash-stat-label">저장한 교수</div>
+              </div>
+            </div>
+            <div class="dash-stat-card">
+              <span class="material-icons-outlined">folder_shared</span>
+              <div>
+                <div class="dash-stat-num" id="dash-stat-jokbo">0</div>
+                <div class="dash-stat-label">내 족보</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dash-section-head">
+            <h2>🔥 인기 교수</h2>
+            <span class="dash-more" id="dash-more-prof">전체 보기 ></span>
+          </div>
+          <div class="dash-prof-list" id="dash-popular-list"></div>
+
+          <div class="dash-section-head">
+            <h2>바로가기</h2>
+          </div>
+          <div class="dash-quick-grid">
+            <button class="dash-quick-card" data-go="search">
+              <span class="material-icons-outlined">search</span>
+              <span>교수 검색</span>
+            </button>
+            <button class="dash-quick-card" data-go="jokbo">
+              <span class="material-icons-outlined">receipt_long</span>
+              <span>족보 상점</span>
+            </button>
+            <button class="dash-quick-card" data-go="mypage">
+              <span class="material-icons-outlined">person</span>
+              <span>마이페이지</span>
+            </button>
+          </div>
+        </section>
+
         <!-- [화면 1] 홈 화면 (교수 검색 목록) -->
-        <section id="view-home" class="page-view">
+        <section id="view-home" class="page-view hidden">
           <div class="home-header">
             <div class="home-logo">
               <span class="material-icons-outlined">school</span>
@@ -282,6 +346,9 @@
                       <option value="2025-2">2025-2 학기</option>
                       <option value="2025-1">2025-1 학기</option>
                     </select>
+                    <select id="input-review-subject" class="clean-select">
+                      <option value="">과목 선택</option>
+                    </select>
                   </div>
 
                   <div class="clean-metric-row">
@@ -364,12 +431,17 @@
             <div id="diagram-authenticated-content" class="diagram-grid">
               <div class="diagram-card chart-area">
                 <h3>교수 평가 다이어그램</h3>
-                <div class="radar-placeholder">
-                  <div class="radar-polygon-quad" id="radar-polygon"></div>
-                  <span class="axis-label n">시험난이도</span>
-                  <span class="axis-label e">과제량</span>
-                  <span class="axis-label s">출결 난이도</span>
-                  <span class="axis-label w">학점난이도</span>
+                <div class="radar-wrap">
+                  <svg
+                    id="radar-svg"
+                    class="radar-svg"
+                    viewBox="0 0 300 280"
+                    aria-label="교수 평가 레이더 차트"
+                  ></svg>
+                </div>
+                <div class="radar-legend">
+                  <span class="legend-dot"></span>
+                  <span id="radar-legend-name">교수님 평균</span>
                 </div>
               </div>
               <div class="diagram-card score-area">
@@ -458,8 +530,9 @@
 
         <!-- [화면 4] 마이페이지 화면 (125P 삭제 처리 완료) -->
         <section id="view-mypage" class="page-view hidden">
-          <div class="home-header">
-            <h2>내 마이페이지</h2>
+          <div class="breadcrumb" style="flex-shrink: 0">
+            홈 &nbsp;/&nbsp;
+            <strong style="color: var(--text-main)">마이페이지</strong>
           </div>
           <div id="mypage-lock-overlay" class="auth-lock-overlay block-style">
             <p>🔒 마이페이지는 로그인 후 조회가 가능한 공간입니다.</p>
@@ -469,6 +542,24 @@
           </div>
 
           <div id="mypage-content" class="mypage-wrapper hidden">
+            <!-- 상단 프로필 바 (뒤로가기 + 아바타 + 가입일) -->
+            <div class="mypage-topbar">
+              <button class="back-btn" id="btn-mypage-back">
+                <span class="material-icons-outlined">arrow_back</span>
+              </button>
+              <div
+                class="big-avatar"
+                id="mypage-avatar"
+                title="클릭하면 프로필 사진을 바꿀 수 있어요"
+              >
+                U
+              </div>
+              <div class="mp-head-meta">
+                <h3 id="mypage-user-display">을지유저</h3>
+                <p id="mypage-user-subdesc">물리치료학과 1학년</p>
+              </div>
+            </div>
+
             <div class="mypage-layout-grid">
               <!-- 좌측 서브 메뉴 구조 -->
               <div class="mypage-aside-nav">
@@ -490,61 +581,17 @@
                   <span class="material-icons-outlined">manage_accounts</span>
                   내 정보 수정
                 </button>
+
+                <button class="mp-nav-logout" id="btn-mypage-logout">
+                  <span class="material-icons-outlined">logout</span> 로그아웃
+                </button>
+                <div class="mp-nav-note">
+                  ✏️ 리뷰를 작성하면 5P를 바로 받을 수 있어요
+                </div>
               </div>
 
               <!-- 우측 메인 섹션 판넬 -->
               <div class="mypage-main-panels">
-                <div class="my-profile-section-clean">
-                  <div
-                    class="big-avatar"
-                    id="mypage-avatar"
-                    title="클릭하면 프로필 사진을 바꿀 수 있어요"
-                  >
-                    U
-                  </div>
-                  <div class="my-meta">
-                    <h3 id="mypage-user-display">을지유저</h3>
-                    <p id="mypage-user-subdesc">물리치료학과 1학년</p>
-                  </div>
-                </div>
-
-                <!-- 학생 인증 및 수강확인서 제출 (탭과 무관하게 항상 노출) -->
-                <div class="my-upload-section">
-                  <h3>📜 학생 인증 및 수강확인서 제출</h3>
-                  <p class="upload-sub-text">
-                    학교 포털 수강확인서 또는 시간표 파일을 등록하시면
-                    <strong>리뷰 작성 권한</strong>이 즉시 활성화됩니다.
-                  </p>
-                  <div class="file-upload-box">
-                    <input
-                      type="file"
-                      id="verification-file-input"
-                      style="display: none"
-                    />
-                    <button
-                      class="upload-mock-btn"
-                      onclick="
-                        document
-                          .getElementById('verification-file-input')
-                          .click()
-                      "
-                    >
-                      <span class="material-icons-outlined">cloud_upload</span>
-                      파일 선택하기
-                    </button>
-                    <span
-                      id="file-name-display"
-                      style="
-                        margin-left: 12px;
-                        font-size: 12px;
-                        font-weight: 600;
-                        color: #d9383a;
-                      "
-                      >수강 확인서 미인증 (리뷰 작성 불가)</span
-                    >
-                  </div>
-                </div>
-
                 <!-- ===== 아래부터 좌측 소메뉴(mp-nav-item)에 따라 전환되는 탭 패널 ===== -->
 
                 <!-- 탭: 포인트 -->
@@ -565,6 +612,21 @@
                       <p class="point-subtext">
                         누적 활동으로 모은 실시간 보유 포인트입니다.
                       </p>
+                      <div class="point-tier-box">
+                        <div class="point-tier-head">
+                          <span class="tier-name" id="tier-name">우수 리뷰어</span>
+                          <span class="tier-next" id="tier-next-text"
+                            >다음 등급까지 25P</span
+                          >
+                        </div>
+                        <div class="point-tier-bar">
+                          <div
+                            class="point-tier-fill"
+                            id="tier-fill"
+                            style="width: 60%"
+                          ></div>
+                        </div>
+                      </div>
                     </div>
 
                     <div class="mp-card">
@@ -579,6 +641,16 @@
                         id="mini-history-list"
                       ></ul>
                     </div>
+                  </div>
+
+                  <!-- 포인트 화면 하단: 내가 가진 족보 (목업과 동일 위치) -->
+                  <div class="my-history-box" style="margin-top: 16px">
+                    <h3>📥 내가 가진 족보</h3>
+                    <ul class="purchased-list" id="point-jokbo-list">
+                      <li class="empty-msg">
+                        아직 구매하거나 등록한 족보가 없습니다.
+                      </li>
+                    </ul>
                   </div>
                 </div>
 
@@ -614,6 +686,43 @@
 
                 <!-- 탭: 내 정보 수정 -->
                 <div id="mp-panel-edit" class="mp-tab-panel hidden">
+                  <!-- 학생 인증 및 수강확인서 제출 (내 정보 수정 탭으로 이동) -->
+                  <div class="my-upload-section" style="margin-bottom: 16px">
+                    <h3>📜 학생 인증 및 수강확인서 제출</h3>
+                    <p class="upload-sub-text">
+                      학교 포털 수강확인서 또는 시간표 파일을 등록하시면
+                      <strong>리뷰 작성 권한</strong>이 즉시 활성화됩니다.
+                    </p>
+                    <div class="file-upload-box">
+                      <input
+                        type="file"
+                        id="verification-file-input"
+                        style="display: none"
+                      />
+                      <button
+                        class="upload-mock-btn"
+                        onclick="
+                          document
+                            .getElementById('verification-file-input')
+                            .click()
+                        "
+                      >
+                        <span class="material-icons-outlined">cloud_upload</span>
+                        파일 선택하기
+                      </button>
+                      <span
+                        id="file-name-display"
+                        style="
+                          margin-left: 12px;
+                          font-size: 12px;
+                          font-weight: 600;
+                          color: #d9383a;
+                        "
+                        >수강 확인서 미인증 (리뷰 작성 불가)</span
+                      >
+                    </div>
+                  </div>
+
                   <div class="my-history-box">
                     <h3>✎ 내 정보 수정</h3>
                     <div class="input-field" style="margin-top: 12px">
@@ -627,10 +736,6 @@
                         id="edit-user-nickname"
                         placeholder="예: 첨단학부1학년"
                       />
-                    </div>
-                    <div class="input-field">
-                      <label>학번</label>
-                      <input type="text" id="edit-user-student-id" />
                     </div>
                     <button
                       class="auth-submit-btn"
@@ -698,15 +803,15 @@
             />
           </div>
           <div class="input-field">
-            <label>학번</label>
-            <input type="text" id="reg-student-id" placeholder="20261234" />
+            <label>전화번호</label>
+            <input type="text" id="reg-phone" placeholder="01012345678" />
           </div>
           <div class="input-field">
             <label>비밀번호 설정</label>
             <input
               type="password"
               id="reg-pwd"
-              placeholder="6자리 이상 비밀번호"
+              placeholder="8자리 이상 비밀번호"
             />
           </div>
           <button class="auth-submit-btn" id="btn-execute-register">
@@ -727,12 +832,16 @@
         </button>
         <h2 class="auth-title">새로운 시험 족보 기여</h2>
         <div class="input-field">
-          <label>담당 교수명</label>
-          <input type="text" id="jk-prof" placeholder="예: 김을지 교수님" />
+          <label>담당 교수 (등록된 교수 중 선택)</label>
+          <select id="jk-prof" class="input-field-select">
+            <option value="">교수님을 선택하세요</option>
+          </select>
         </div>
         <div class="input-field">
-          <label>과목명</label>
-          <input type="text" id="jk-subject" placeholder="예: 운동처방학" />
+          <label>과목 (선택한 교수의 담당 과목)</label>
+          <select id="jk-subject" class="input-field-select">
+            <option value="">먼저 교수님을 선택하세요</option>
+          </select>
         </div>
         <div class="input-field">
           <label>시험 분류 유형</label>
