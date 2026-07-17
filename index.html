@@ -20,7 +20,7 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="강의라운지" />
+    <meta name="apple-mobile-web-app-title" content="전공위키" />
   </head>
   <body>
     <!-- 모바일 전용 햄버거 메뉴 버튼 (데스크톱에서는 숨김) -->
@@ -660,13 +660,35 @@
                   </div>
                 </div>
 
-                <!-- 탭: 활동 내역 (포인트 전체 획득/차감 로그) -->
+                <!-- 탭: 활동 내역 (포인트 전체 획득/차감 로그 + 내 태그 기여 이력) -->
                 <div id="mp-panel-history" class="mp-tab-panel hidden">
                   <div class="mp-card" style="justify-content: flex-start">
                     <div class="card-label-row">
                       <span>전체 활동 내역</span>
                     </div>
                     <ul class="points-history-list" id="full-history-list"></ul>
+                  </div>
+                  <div
+                    class="mp-card"
+                    style="justify-content: flex-start; margin-top: 16px"
+                  >
+                    <div class="card-label-row">
+                      <span>📝 내 리뷰 이력</span>
+                    </div>
+                    <ul class="tag-history-list" id="my-review-history-list">
+                      <li class="empty-msg">불러오는 중…</li>
+                    </ul>
+                  </div>
+                  <div
+                    class="mp-card"
+                    style="justify-content: flex-start; margin-top: 16px"
+                  >
+                    <div class="card-label-row">
+                      <span>🏷️ 내 태그 기여 이력</span>
+                    </div>
+                    <ul class="tag-history-list" id="my-tag-history-list">
+                      <li class="empty-msg">불러오는 중…</li>
+                    </ul>
                   </div>
                 </div>
 
@@ -696,13 +718,23 @@
                   <div class="my-upload-section" style="margin-bottom: 16px">
                     <h3>📜 학생 인증 및 수강확인서 제출</h3>
                     <p class="upload-sub-text">
-                      학교 포털 수강확인서 또는 시간표 파일을 등록하시면
-                      <strong>리뷰 작성 권한</strong>이 즉시 활성화됩니다.
+                      학기를 선택하고 수강확인서 파일(jpg/png/pdf, 최대 10MB)을
+                      등록하면 서버에 <strong>제출(승인 대기)</strong>됩니다.
                     </p>
+                    <div class="input-field" style="margin: 8px 0 10px">
+                      <label>학기</label>
+                      <select id="enroll-semester" class="clean-select">
+                        <option value="2026-1">2026-1 학기</option>
+                        <option value="2025-2">2025-2 학기</option>
+                        <option value="2025-1">2025-1 학기</option>
+                        <option value="2024-2">2024-2 학기</option>
+                      </select>
+                    </div>
                     <div class="file-upload-box">
                       <input
                         type="file"
                         id="verification-file-input"
+                        accept="image/jpeg,image/png,application/pdf"
                         style="display: none"
                       />
                       <button
@@ -716,7 +748,7 @@
                         <span class="material-icons-outlined"
                           >cloud_upload</span
                         >
-                        파일 선택하기
+                        파일 선택 후 제출
                       </button>
                       <span
                         id="file-name-display"

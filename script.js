@@ -1,5 +1,5 @@
 // ============================================================
-// 강의라운지 - 상태 관리 + 영속 저장(localStorage 데모 DB)
+// 전공위키 - 상태 관리 + 영속 저장(localStorage 데모 DB)
 // ============================================================
 // 실제 서비스에서는 이 저장소 레이어(getUsers/saveUsers 등)를
 // 백엔드 REST API 호출로 교체하면 된다. 비밀번호를 평문으로 저장하는 것도
@@ -14,9 +14,7 @@
 // Live Server(5500)로 열면 CORS 프록시(8082)를 거쳐 백엔드를 호출하고,
 // 도커 프론트(8080) 등 그 외 환경에서는 백엔드(8081)를 직접 호출한다.
 const API_BASE =
-  location.port === '5500'
-    ? 'http://localhost:8082'
-    : 'http://localhost:8081';
+  location.port === '5500' ? 'http://localhost:8082' : 'http://localhost:8081';
 
 // ============================================================
 // [API 연동] JWT 토큰 처리 도구
@@ -128,7 +126,9 @@ function showToast(message, type) {
   // 타입 자동 감지
   if (!type) {
     if (/실패|오류|없습니다|않|불가|에러|거절/.test(msg)) type = 'error';
-    else if (/성공|환영|축하|완료|적립|충전|저장|게시|접수|🎁|🔑|🏷️|🎉|📝/.test(msg))
+    else if (
+      /성공|환영|축하|완료|적립|충전|저장|게시|접수|🎁|🔑|🏷️|🎉|📝/.test(msg)
+    )
       type = 'success';
     else type = 'info';
   }
@@ -150,9 +150,9 @@ function showToast(message, type) {
 window.alert = (msg) => showAppDialog(msg);
 
 const STORAGE_KEYS = {
-  USERS: 'gl_users',           // { [email]: userRecord } - 계정별 데이터
+  USERS: 'gl_users', // { [email]: userRecord } - 계정별 데이터
   PROFESSORS: 'gl_professors', // 교수 목록(리뷰/태그/다이어그램 지표 포함) - 모든 계정 공유
-  JOKBO: 'gl_jokbo',           // 족보 상점 데이터 - 모든 계정 공유
+  JOKBO: 'gl_jokbo', // 족보 상점 데이터 - 모든 계정 공유
   SESSION: 'gl_session_email', // 현재 로그인 중인 계정 이메일
 };
 
@@ -471,7 +471,7 @@ function renderJokboStore() {
       const isOwned = purchasedJokbo.some((p) => p.id === item.id);
       const registrantText = item.registeredBy
         ? `등록자: ${item.registeredBy}`
-        : '강의라운지 기본 제공';
+        : '전공위키 기본 제공';
       // 내가 등록한 족보만 삭제 버튼 노출
       const canDelete = isLoggedIn && item.registeredBy === userNickname;
       return `
@@ -593,6 +593,179 @@ function switchMypageTab(tab) {
   if (tab === 'point' || tab === 'jokbo') renderPurchasedJokboList();
   if (tab === 'bookmark') renderBookmarkListInMypage();
   if (tab === 'edit') fillEditProfileForm();
+  if (tab === 'history') fetchMyTagHistory(); // 내 태그 클릭 이력(서버)
+  if (tab === 'history') fetchMyReviewHistory(); // 내 리뷰 이력(서버)
+  if (tab === 'point' || tab === 'history') fetchMyPointHistory(); // 서버 포인트 내역
+}
+
+// [API 연동] 내 리뷰 이력 조회 (GET /api/reviews/me, 인증 필요)
+//  성공 200 REVIEW_200_3 → data: [{ reviewId, professorName, subjectName, content, createdAt }] (최신순)
+//  실패 401 AUTH_401_001
+async function fetchMyReviewHistory() {
+  const listEl = document.getElementById('my-review-history-list');
+  if (!listEl) return;
+  if (!getToken()) {
+    listEl.innerHTML = '<li class="empty-msg">로그인 후 확인할 수 있어요.</li>';
+    return;
+  }
+  listEl.innerHTML = '<li class="empty-msg">불러오는 중…</li>';
+  try {
+    const res = await authFetch(`${API_BASE}/api/reviews/me`);
+    if (!res.ok) {
+      listEl.innerHTML =
+        res.status === 401
+          ? '<li class="empty-msg">세션이 만료됐어요. 다시 로그인해 주세요.</li>'
+          : '<li class="empty-msg">리뷰 이력을 불러오지 못했어요.</li>';
+      return;
+    }
+    const body = await res.json().catch(() => ({}));
+    const list = Array.isArray(body.data) ? body.data : [];
+    if (!list.length) {
+      listEl.innerHTML =
+        '<li class="empty-msg">아직 작성한 리뷰가 없어요. 교수 상세에서 후기를 남겨보세요.</li>';
+      return;
+    }
+    listEl.innerHTML = list
+      .map((r) => {
+        const when = (r.createdAt || '').slice(0, 10).replace(/-/g, '.');
+        const prof = [r.professorName, r.subjectName]
+          .filter(Boolean)
+          .join(' · ');
+        return `
+      <li class="review-hist-item">
+        <div class="rh-top">
+          <span class="th-prof">${prof}</span>
+          <span class="th-date">${when}</span>
+        </div>
+        <div class="rh-content">${r.content || ''}</div>
+      </li>`;
+      })
+      .join('');
+  } catch (e) {
+    console.warn('내 리뷰 이력 조회 실패:', e);
+    listEl.innerHTML = '<li class="empty-msg">서버 연결에 실패했어요.</li>';
+  }
+}
+
+// [API 연동] 내 정보 조회 (GET /api/users/me, 인증 필요)
+//  성공 200 USER_200_3 → data { userId, username, name, nickname, phone, point, role }
+//  서버 값으로 이름/닉네임/포인트/관리자여부를 갱신(서버가 기준).
+async function fetchMyInfo() {
+  if (!getToken()) return;
+  try {
+    const res = await authFetch(`${API_BASE}/api/users/me`);
+    if (!res.ok) {
+      console.warn('내 정보 조회 실패:', res.status);
+      return;
+    }
+    const body = await res.json().catch(() => ({}));
+    const d = body.data;
+    if (!d) return;
+
+    if (d.name) userName = d.name;
+    if (d.nickname) userNickname = d.nickname;
+    if (typeof d.point === 'number') userPoints = d.point;
+    if (d.role) isAdmin = String(d.role).toUpperCase().includes('ADMIN');
+
+    // 로컬 계정에도 최신 정보 반영(role/phone 등)
+    const users = getUsers();
+    if (currentUserEmail && users[currentUserEmail]) {
+      const u = users[currentUserEmail];
+      if (d.role) u.role = d.role;
+      if (d.phone) u.phone = d.phone;
+      if (d.name) u.name = d.name;
+      if (d.nickname) u.nickname = d.nickname;
+      saveUsers(users);
+    }
+    syncCurrentUserToStorage();
+    updateAuthUI();
+  } catch (e) {
+    console.warn('내 정보 조회 연결 실패:', e);
+  }
+}
+
+// [API 연동] 포인트 내역 조회 (GET /api/points/me, 인증 필요)
+//  성공 200 POINT_200_1 → data: [{ pointHistoryId, amount, reason, createdAt }] (최신순)
+//  amount 양수=적립, 음수=차감. 서버가 포인트의 기준(source of truth).
+const POINT_REASON_LABELS = {
+  SIGNUP_BONUS: '회원가입 기본 지급',
+  EXAM_ARCHIVE_VIEW: '족보 열람 차감',
+  REVIEW_WRITE: '리뷰 작성 보상',
+  TAG_CLICK: '태그 기여',
+};
+async function fetchMyPointHistory() {
+  if (!getToken()) return;
+  try {
+    const res = await authFetch(`${API_BASE}/api/points/me`);
+    if (!res.ok) {
+      console.warn('포인트 내역 조회 실패:', res.status);
+      return;
+    }
+    const body = await res.json().catch(() => ({}));
+    const list = Array.isArray(body.data) ? body.data : [];
+    // 서버 내역 → 프론트 표시 형식으로 변환(최신순 유지)
+    pointHistoryLog = list.map((h) => ({
+      label: POINT_REASON_LABELS[h.reason] || h.reason,
+      delta: h.amount,
+    }));
+    // 서버 합계를 보유 포인트로 반영(서버가 기준)
+    userPoints = list.reduce((s, h) => s + (Number(h.amount) || 0), 0);
+    syncCurrentUserToStorage();
+
+    // 화면 갱신
+    const upEl = document.getElementById('user-points');
+    if (upEl) upEl.innerText = userPoints;
+    const mpEl = document.getElementById('mypage-points-dynamic');
+    if (mpEl) mpEl.innerText = userPoints;
+    renderPointHistory();
+    renderDashboard();
+  } catch (e) {
+    console.warn('포인트 내역 조회 연결 실패:', e);
+  }
+}
+
+// [API 연동] 내 태그 클릭 이력 조회 (GET /api/tags/me, 인증 필요)
+//  성공 200 TAG_200_3 → data: [{ tagClickId, professorId, professorName, tagId, tagName, createdAt }]
+//  실패 401 AUTH_401_001 (인증 필요)
+async function fetchMyTagHistory() {
+  const listEl = document.getElementById('my-tag-history-list');
+  if (!listEl) return;
+  if (!getToken()) {
+    listEl.innerHTML = '<li class="empty-msg">로그인 후 확인할 수 있어요.</li>';
+    return;
+  }
+  listEl.innerHTML = '<li class="empty-msg">불러오는 중…</li>';
+  try {
+    const res = await authFetch(`${API_BASE}/api/tags/me`);
+    if (!res.ok) {
+      listEl.innerHTML =
+        res.status === 401
+          ? '<li class="empty-msg">세션이 만료됐어요. 다시 로그인해 주세요.</li>'
+          : '<li class="empty-msg">태그 이력을 불러오지 못했어요.</li>';
+      return;
+    }
+    const body = await res.json().catch(() => ({}));
+    const list = Array.isArray(body.data) ? body.data : [];
+    if (!list.length) {
+      listEl.innerHTML =
+        '<li class="empty-msg">아직 클릭한 태그가 없어요. 교수 상세에서 태그를 달아보세요.</li>';
+      return;
+    }
+    listEl.innerHTML = list
+      .map((t) => {
+        const when = (t.createdAt || '').slice(0, 10).replace(/-/g, '.');
+        return `
+      <li>
+        <span class="th-tag">${t.tagName}</span>
+        <span class="th-prof">${t.professorName || ''}</span>
+        <span class="th-date">${when}</span>
+      </li>`;
+      })
+      .join('');
+  } catch (e) {
+    console.warn('내 태그 이력 조회 실패:', e);
+    listEl.innerHTML = '<li class="empty-msg">서버 연결에 실패했어요.</li>';
+  }
 }
 
 function renderBookmarkListInMypage() {
@@ -631,53 +804,103 @@ function fillEditProfileForm() {
   if (nicknameInput) nicknameInput.value = userNickname;
 }
 
-document.getElementById('btn-save-profile').addEventListener('click', () => {
-  const newName = document.getElementById('edit-user-name').value.trim();
-  const newNickname = document
-    .getElementById('edit-user-nickname')
-    .value.trim();
-  const pwdEl = document.getElementById('edit-user-password');
-  const pwdConfirmEl = document.getElementById('edit-user-password-confirm');
-  const newPwd = pwdEl ? pwdEl.value : '';
-  const newPwdConfirm = pwdConfirmEl ? pwdConfirmEl.value : '';
-
-  if (!newName || !newNickname) {
-    alert('이름, 닉네임을 모두 입력해 주세요.');
-    return;
+// [API 연동] 내 정보 수정 (PATCH /api/users/me, 인증 필요)
+//  request(모두 optional): { name, nickname, newPassword(8~100자) } - 미포함 필드는 기존값 유지
+//  성공 200 USER_200_4 → data { userId, username, name, nickname, phone, point, role }
+//  실패 401 AUTH_401_001
+async function updateMyInfoOnServer(body) {
+  if (!canSyncToServer()) return { data: null, status: 0 };
+  try {
+    const res = await authFetch(`${API_BASE}/api/users/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const resBody = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.warn('내 정보 수정 실패:', res.status, resBody.code || '');
+      return { data: null, status: res.status };
+    }
+    return { data: resBody.data || null, status: res.status };
+  } catch (e) {
+    console.warn('내 정보 수정 연결 실패:', e);
+    return { data: null, status: 0 };
   }
+}
 
-  // 비밀번호는 입력했을 때만 변경 (비워두면 기존 비밀번호 유지)
-  if (newPwd || newPwdConfirm) {
-    if (newPwd.length < 8) {
-      alert('비밀번호는 8자리 이상으로 설정해 주세요.');
+document
+  .getElementById('btn-save-profile')
+  .addEventListener('click', async () => {
+    const newName = document.getElementById('edit-user-name').value.trim();
+    const newNickname = document
+      .getElementById('edit-user-nickname')
+      .value.trim();
+    const pwdEl = document.getElementById('edit-user-password');
+    const pwdConfirmEl = document.getElementById('edit-user-password-confirm');
+    const newPwd = pwdEl ? pwdEl.value : '';
+    const newPwdConfirm = pwdConfirmEl ? pwdConfirmEl.value : '';
+
+    if (!newName || !newNickname) {
+      alert('이름, 닉네임을 모두 입력해 주세요.');
       return;
     }
-    if (newPwd !== newPwdConfirm) {
-      alert('새 비밀번호가 서로 일치하지 않습니다.');
-      return;
+
+    // 비밀번호는 입력했을 때만 변경 (비워두면 기존 비밀번호 유지)
+    if (newPwd || newPwdConfirm) {
+      if (newPwd.length < 8) {
+        alert('비밀번호는 8자리 이상으로 설정해 주세요.');
+        return;
+      }
+      if (newPwd !== newPwdConfirm) {
+        alert('새 비밀번호가 서로 일치하지 않습니다.');
+        return;
+      }
     }
+
+    // 서버로 PATCH (변경 필드만 담아 전송)
+    const payload = { name: newName, nickname: newNickname };
+    if (newPwd) payload.newPassword = newPwd;
+    const result = await updateMyInfoOnServer(payload);
+
+    if (result.data) {
+      // 서버가 반환한 최신 값으로 반영
+      userName = result.data.name || newName;
+      userNickname = result.data.nickname || newNickname;
+      if (typeof result.data.point === 'number') userPoints = result.data.point;
+    } else {
+      // 서버 미연동/실패 시 로컬만 반영
+      userName = newName;
+      userNickname = newNickname;
+    }
+
+    // 로컬 계정 정보도 갱신(비번은 로컬 데모 로그인 대비 보관)
     const users = getUsers();
     if (currentUserEmail && users[currentUserEmail]) {
-      users[currentUserEmail].password = newPwd;
+      users[currentUserEmail].name = userName;
+      users[currentUserEmail].nickname = userNickname;
+      if (newPwd) users[currentUserEmail].password = newPwd;
       saveUsers(users);
     }
-  }
+    syncCurrentUserToStorage();
+    updateAuthUI();
 
-  userName = newName;
-  userNickname = newNickname;
-  syncCurrentUserToStorage();
-  updateAuthUI();
+    if (pwdEl) pwdEl.value = '';
+    if (pwdConfirmEl) pwdConfirmEl.value = '';
 
-  // 저장 후 비밀번호 입력칸 비우기
-  if (pwdEl) pwdEl.value = '';
-  if (pwdConfirmEl) pwdConfirmEl.value = '';
-
-  alert(
-    newPwd
-      ? '✅ 내 정보와 비밀번호가 수정되었습니다.'
-      : '✅ 내 정보가 수정되었습니다.',
-  );
-});
+    if (result.data) {
+      alert(
+        newPwd
+          ? '✅ 내 정보와 비밀번호가 수정되었습니다. (서버 반영 완료)'
+          : '✅ 내 정보가 수정되었습니다. (서버 반영 완료)',
+      );
+    } else if (result.status === 401) {
+      alert(
+        '세션이 만료됐어요. 변경은 화면에만 반영됐고, 다시 로그인 후 저장하면 서버에도 반영됩니다.',
+      );
+    } else {
+      alert('내 정보가 수정되었습니다. (서버 미연동 - 화면에만 반영)');
+    }
+  });
 
 document.querySelector('.mypage-aside-nav').addEventListener('click', (e) => {
   const btn = e.target.closest('.mp-nav-item[data-tab]');
@@ -728,7 +951,7 @@ function viewJokboContentById(jokboId) {
 
   document.getElementById('jokbo-view-title').innerText = item.subject;
   document.getElementById('jokbo-view-meta').innerText =
-    `${item.profName} · ${item.type} · 등록자: ${item.registeredBy || '강의라운지 기본 제공'}`;
+    `${item.profName} · ${item.type} · 등록자: ${item.registeredBy || '전공위키 기본 제공'}`;
   document.getElementById('jokbo-view-content').innerText =
     item.content || '등록된 텍스트 내용이 없습니다. (기본 제공 족보)';
 
@@ -790,17 +1013,16 @@ async function loadAllExamArchivesForStore() {
 }
 
 // ============================================================
-// [API 연동] 족보(기출자료) 신규 등록  ★엔드포인트는 추정 — 명세서로 확인 필요★
-//  추정: POST /api/professors/{professorId}/exam-archives
-//  request: { title, content, writerSemester }  (인증 필요)
-//  response data: { examArchiveId, title, content, writerSemester, createdAt }
-//  실패해도 로컬 등록은 유지된다.
-// ============================================================
-async function createExamArchiveOnServer(professorId, title, content, writerSemester) {
-  if (!professorId) return null;
+// [API 연동] 족보(기출자료) 작성 (POST /api/professors/{professorId}/exam-archives, 인증 필요)
+//  request: { title, content }  (텍스트 전용, 파일/이미지 불가)
+//  성공 201 EXAM_ARCHIVE_201_1 → data { examArchiveId, title, content, writerSemester, createdAt }
+//  실패 401 AUTH_401_001(인증) / 403 CERT_403_1(수강확인서 승인자가 아님)
+//  { data, status, code } 형태로 반환. 실패해도 로컬 등록은 유지된다.
+async function createExamArchiveOnServer(professorId, title, content) {
+  if (!professorId) return { data: null, status: 0, code: '' };
   if (!canSyncToServer()) {
-    console.info('토큰 없음/만료 → 족보 서버 등록 생략(로컬만 반영)');
-    return null;
+    console.info('토큰 없음/만료 → 족보 서버 작성 생략(로컬만 반영)');
+    return { data: null, status: 0, code: '' };
   }
   try {
     const res = await authFetch(
@@ -808,18 +1030,22 @@ async function createExamArchiveOnServer(professorId, title, content, writerSeme
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, writerSemester }),
+        body: JSON.stringify({ title, content }),
       },
     );
-    if (!res.ok) {
-      console.warn('족보 서버 등록 실패:', res.status);
-      return null;
-    }
     const body = await res.json().catch(() => ({}));
-    return body.data || null;
+    if (!res.ok) {
+      console.warn('족보 서버 작성 실패:', res.status, body.code || '');
+      return { data: null, status: res.status, code: body.code || '' };
+    }
+    return {
+      data: body.data || null,
+      status: res.status,
+      code: body.code || '',
+    };
   } catch (e) {
-    console.warn('족보 서버 등록 연결 실패, 로컬만 반영:', e);
-    return null;
+    console.warn('족보 서버 작성 연결 실패, 로컬만 반영:', e);
+    return { data: null, status: 0, code: '' };
   }
 }
 
@@ -922,37 +1148,100 @@ document
     );
     renderJokboStore();
 
-    // 서버에도 등록 시도. 성공하면 서버 id/내용으로 연결(열람 시 서버 API 사용)
-    createExamArchiveOnServer(Number(profId), title, content, type).then(
-      (created) => {
-        if (created && created.examArchiveId) {
-          const j = jokboStoreData.find((x) => x.id === newId);
-          if (j) {
-            j.id = created.examArchiveId; // 서버 id로 교체
-            j.fromServer = true; // 열람 시 서버에서 내용 조회
-            saveJokboData();
-            renderJokboStore();
-          }
+    // 서버에도 작성 시도(텍스트 전용 { title, content }). 성공 시 서버 id로 연결.
+    createExamArchiveOnServer(Number(profId), title, content).then((r) => {
+      if (r.data && r.data.examArchiveId) {
+        const j = jokboStoreData.find((x) => x.id === newId);
+        if (j) {
+          j.id = r.data.examArchiveId; // 서버 id로 교체
+          j.fromServer = true; // 열람 시 서버 content API 사용
+          j.content = r.data.content || j.content;
+          saveJokboData();
+          renderJokboStore();
         }
-      },
-    );
+      } else if (r.code === 'CERT_403_1' || r.status === 403) {
+        alert(
+          '방금 족보는 화면에만 등록됐어요.\n서버 저장은 "수강확인서 승인자"만 가능합니다. (승인 후 다시 등록하면 서버에도 저장돼요)',
+        );
+      } else if (r.status === 401) {
+        alert(
+          '세션이 만료돼 서버 저장은 생략됐어요. 다시 로그인 후 등록하면 서버에도 저장됩니다.',
+        );
+      }
+    });
   });
 
-// 수강확인서 파일 제출
+// [API 연동] 수강확인서 등록 (POST /api/enrollments, multipart/form-data)
+//  request: file(jpg/png/pdf, 10MB↓) + semester(예 "2025-2")
+//  성공 201 ENROLLMENT_201_1 → { enrollmentApplicationId, semester, status:"PENDING" } (승인 대기)
+//  실패 400 FILE_400_1(형식) / COMMON_400_2(semester 누락) / 401 / 413 COMMON_413(10MB 초과)
 document
   .getElementById('verification-file-input')
-  .addEventListener('change', (e) => {
+  .addEventListener('change', async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      isCertified = true;
-      document.getElementById('file-name-display').innerText =
-        `✅ 수강인증 완료 (${file.name})`;
-      document.getElementById('file-name-display').style.color = '#2b8a3e';
-      syncCurrentUserToStorage();
-      alert(
-        '🎉 학생 수강인증이 확인되었습니다. 이제 클린리뷰 등록 권한이 활성화됩니다.',
-      );
-      updateAuthUI();
+    if (!file) return;
+    const display = document.getElementById('file-name-display');
+
+    // 클라이언트 사전 검증(형식/용량)
+    const okTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!okTypes.includes(file.type)) {
+      alert('허용되지 않는 파일 형식이에요. (jpg/png/pdf만 가능)');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('파일 용량이 10MB를 초과했어요.');
+      e.target.value = '';
+      return;
+    }
+    if (!getToken()) {
+      alert('수강확인서 제출은 로그인이 필요해요.');
+      return;
+    }
+
+    const semester = document.getElementById('enroll-semester').value;
+    const form = new FormData();
+    form.append('file', file);
+    form.append('semester', semester);
+
+    display.innerText = '제출 중…';
+    display.style.color = '#868e96';
+    try {
+      // multipart는 Content-Type을 브라우저가 boundary와 함께 자동 설정하므로 헤더 지정 안 함
+      const res = await authFetch(`${API_BASE}/api/enrollments`, {
+        method: 'POST',
+        body: form,
+      });
+      const body = await res.json().catch(() => ({}));
+      const code = body.code || '';
+      if (res.ok) {
+        // 서버는 PENDING(관리자 승인 대기)로 저장. 데모에선 리뷰 작성이 막히지 않도록 로컬 인증도 활성화.
+        isCertified = true;
+        syncCurrentUserToStorage();
+        updateAuthUI();
+        display.innerText = `📤 제출 완료 (${semester}, 승인 대기)`;
+        display.style.color = '#2b8a3e';
+        alert(
+          '수강확인서가 제출되었어요. (상태: 승인 대기)\n관리자 승인 후 정식 인증되며, 데모에선 리뷰 작성이 바로 활성화됩니다.',
+        );
+      } else if (res.status === 413 || code === 'COMMON_413') {
+        alert('파일 용량이 10MB를 초과했어요.');
+        display.innerText = '수강 확인서 미인증 (리뷰 작성 불가)';
+        display.style.color = '#d9383a';
+      } else if (code === 'FILE_400_1') {
+        alert('허용되지 않는 파일 형식이에요. (jpg/png/pdf만 가능)');
+      } else if (code === 'COMMON_400_2') {
+        alert('학기(semester)를 선택해 주세요.');
+      } else if (res.status === 401) {
+        alert('세션이 만료됐어요. 다시 로그인 후 제출해 주세요.');
+      } else {
+        alert(`수강확인서 제출에 실패했어요. (${res.status})`);
+      }
+    } catch (err) {
+      console.warn('수강확인서 제출 연결 실패:', err);
+      alert('서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      e.target.value = '';
     }
   });
 
@@ -1065,7 +1354,8 @@ document.getElementById('btn-submit-review').addEventListener('click', () => {
 
   // 서버에도 리뷰 작성 시도 (request: { subjectId, content })
   const subjectSel = document.getElementById('input-review-subject');
-  const subjectId = subjectSel && subjectSel.value ? Number(subjectSel.value) : null;
+  const subjectId =
+    subjectSel && subjectSel.value ? Number(subjectSel.value) : null;
   createReviewOnServer(prof.id, subjectId, textInput.value);
 
   prof.reviewCount = prof.reviews.length;
@@ -1114,12 +1404,11 @@ function renderProfessorList() {
       p.dept,
       p.college,
       ...(p.tags || []),
-      ...((p.allTags || []).map((t) => t.name)),
+      ...(p.allTags || []).map((t) => t.name),
       ...(p.subjects || []),
     ];
     const matchQuery =
-      !query ||
-      haystacks.some((h) => (h || '').toLowerCase().includes(query));
+      !query || haystacks.some((h) => (h || '').toLowerCase().includes(query));
     const matchDept = filterDept === 'all' || p.dept === filterDept;
     const matchGrade = filterGrade === 'all' || p.grade === filterGrade;
     return matchQuery && matchDept && matchGrade;
@@ -1233,7 +1522,8 @@ function reportReview(reviewId) {
   const chips = document.getElementById('report-reason-chips');
   if (chips) {
     chips.innerHTML = REPORT_REASONS.map(
-      (r) => `<button type="button" class="report-reason-chip" data-reason="${r}">${r}</button>`,
+      (r) =>
+        `<button type="button" class="report-reason-chip" data-reason="${r}">${r}</button>`,
     ).join('');
   }
   const input = document.getElementById('report-reason-input');
@@ -1404,104 +1694,110 @@ document
     }
   });
 
-document.getElementById('btn-execute-login').addEventListener('click', async () => {
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-pwd').value;
+document
+  .getElementById('btn-execute-login')
+  .addEventListener('click', async () => {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-pwd').value;
 
-  if (!email || !password) {
-    alert('이메일과 비밀번호를 입력해 주세요.');
-    return;
-  }
-
-  // ── 서버로 로그인 요청 ────────────────────────────────
-  // 명세서 request 형식: { username, password }
-  const btn = document.getElementById('btn-execute-login');
-  btn.disabled = true;
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: email, password }),
-    });
-
-    if (!res.ok) {
-      let msg = '이메일 또는 비밀번호가 올바르지 않습니다.';
-      try {
-        const err = await res.json();
-        if (err && err.message) msg = err.message;
-      } catch (_) {}
-      alert(`로그인에 실패했어요\n${msg}`);
+    if (!email || !password) {
+      alert('이메일과 비밀번호를 입력해 주세요.');
       return;
     }
 
-    // 서버가 돌려준 response 데이터
-    const data = await res.json().catch(() => ({}));
-    const loginToken = pickToken(data);
-    setToken(loginToken); // 토큰이 있으면 저장(이후 인증 요청에 자동 사용)
-    __tokenExpiredNotified = false; // 새로 로그인했으니 만료 안내 플래그 초기화
-    if (loginToken)
-      console.info('로그인 토큰 저장 완료(인증 요청에 자동 사용).');
-    else
-      console.warn(
-        '로그인 응답에서 토큰(JWT)을 못 찾았습니다. 인증이 필요한 요청(태그/신고 등)이 403이 날 수 있어요. 로그인 응답 형식을 확인하세요:',
-        data,
-      );
+    // ── 서버로 로그인 요청 ────────────────────────────────
+    // 명세서 request 형식: { username, password }
+    const btn = document.getElementById('btn-execute-login');
+    btn.disabled = true;
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: email, password }),
+      });
 
-    // 서버 인증 성공 → 앱이 쓰는 로컬 세션으로 이어줌(다른 기능 유지용)
-    const users = getUsers();
-    if (!users[email]) {
-      // 이 브라우저에 로컬 계정 기록이 없으면 최소 정보로 생성
-      users[email] = {
-        email,
-        password,
-        name: data.name || email,
-        nickname: data.nickname || email.split('@')[0],
-        phone: data.phone || '',
-        points: 20,
-        isCertified: false,
-        joinDate: todayDateStr(),
-        bookmarkedIds: [],
-        purchasedJokboIds: [],
-        taggedProfessorIds: [],
-        pointHistoryLog: [],
-        profileImage: null,
-      };
-      saveUsers(users);
-    }
+      if (!res.ok) {
+        let msg = '이메일 또는 비밀번호가 올바르지 않습니다.';
+        try {
+          const err = await res.json();
+          if (err && err.message) msg = err.message;
+        } catch (_) {}
+        alert(`로그인에 실패했어요\n${msg}`);
+        return;
+      }
 
-    // 서버가 롤(role/authority)을 내려주면 계정에 저장 → 관리자 판별에 사용
-    const serverRole =
-      data.role || data.authority || (data.data && (data.data.role || data.data.authority));
-    if (serverRole) {
-      users[email].role = serverRole;
-      saveUsers(users);
-    }
+      // 서버가 돌려준 response 데이터
+      const data = await res.json().catch(() => ({}));
+      const loginToken = pickToken(data);
+      setToken(loginToken); // 토큰이 있으면 저장(이후 인증 요청에 자동 사용)
+      __tokenExpiredNotified = false; // 새로 로그인했으니 만료 안내 플래그 초기화
+      if (loginToken)
+        console.info('로그인 토큰 저장 완료(인증 요청에 자동 사용).');
+      else
+        console.warn(
+          '로그인 응답에서 토큰(JWT)을 못 찾았습니다. 인증이 필요한 요청(태그/신고 등)이 403이 날 수 있어요. 로그인 응답 형식을 확인하세요:',
+          data,
+        );
 
-    loadUserIntoSession(email);
-    setCurrentUserEmail(email);
-    document.getElementById('auth-modal').classList.add('hidden');
-    updateAuthUI();
-    if (isAdmin) {
-      // 관리자 계정으로 로그인하면 바로 관리자 페이지(모달)로 이동
-      alert(`관리자님, 환영합니다.\n관리자 페이지로 이동합니다.`);
-      openAdminModal();
-    } else {
+      // 서버 인증 성공 → 앱이 쓰는 로컬 세션으로 이어줌(다른 기능 유지용)
+      const users = getUsers();
+      if (!users[email]) {
+        // 이 브라우저에 로컬 계정 기록이 없으면 최소 정보로 생성
+        users[email] = {
+          email,
+          password,
+          name: data.name || email,
+          nickname: data.nickname || email.split('@')[0],
+          phone: data.phone || '',
+          points: 20,
+          isCertified: false,
+          joinDate: todayDateStr(),
+          bookmarkedIds: [],
+          purchasedJokboIds: [],
+          taggedProfessorIds: [],
+          pointHistoryLog: [],
+          profileImage: null,
+        };
+        saveUsers(users);
+      }
+
+      // 서버가 롤(role/authority)을 내려주면 계정에 저장 → 관리자 판별에 사용
+      const serverRole =
+        data.role ||
+        data.authority ||
+        (data.data && (data.data.role || data.data.authority));
+      if (serverRole) {
+        users[email].role = serverRole;
+        saveUsers(users);
+      }
+
+      loadUserIntoSession(email);
+      setCurrentUserEmail(email);
+      document.getElementById('auth-modal').classList.add('hidden');
+      updateAuthUI();
+      fetchMyInfo(); // 서버 기준 이름/닉네임/포인트/role 반영
+      fetchMyPointHistory(); // 서버 포인트 내역/잔액을 화면에 반영
+      if (isAdmin) {
+        // 관리자 계정으로 로그인하면 바로 관리자 페이지(모달)로 이동
+        alert(`관리자님, 환영합니다.\n관리자 페이지로 이동합니다.`);
+        openAdminModal();
+      } else {
+        alert(
+          `로그인 되었습니다!\n${userNickname}님, 환영합니다.\n전공 교수 리뷰에서 다양한 정보를 확인해보세요.`,
+        );
+      }
+    } catch (e) {
+      console.error('로그인 요청 오류:', e);
       alert(
-        `로그인 되었습니다!\n${userNickname}님, 환영합니다.\n전공 교수 리뷰에서 다양한 정보를 확인해보세요.`,
+        '서버에 연결하지 못했습니다.\n' +
+          '· 백엔드 서버가 켜져 있는지\n' +
+          `· API_BASE 주소가 맞는지 (현재: ${API_BASE})\n` +
+          '확인해 주세요.',
       );
+    } finally {
+      btn.disabled = false;
     }
-  } catch (e) {
-    console.error('로그인 요청 오류:', e);
-    alert(
-      '서버에 연결하지 못했습니다.\n' +
-        '· 백엔드 서버가 켜져 있는지\n' +
-        `· API_BASE 주소가 맞는지 (현재: ${API_BASE})\n` +
-        '확인해 주세요.',
-    );
-  } finally {
-    btn.disabled = false;
-  }
-});
+  });
 
 // ============================================================
 // 태그 기여 - 직접 입력 대신, 미리 정의된 태그를 '클릭'해서 기여한다.
@@ -1552,7 +1848,8 @@ function renderTagChoiceList() {
   serverTags.forEach((t) => add(t.name));
   getLocalCreatedTags().forEach(add);
   PRESET_TAGS.forEach(add);
-  if (prof && Array.isArray(prof.allTags)) prof.allTags.forEach((t) => add(t.name));
+  if (prof && Array.isArray(prof.allTags))
+    prof.allTags.forEach((t) => add(t.name));
 
   container.innerHTML = candidates
     .map(
@@ -1643,7 +1940,9 @@ async function handleAdminCreateTag() {
     addLocalCreatedTag(name);
     if (input) input.value = '';
     renderTagChoiceList();
-    alert(`서버 등록 실패(${result.status}). "${name}" 를 화면에 임시 추가했어요.`);
+    alert(
+      `서버 등록 실패(${result.status}). "${name}" 를 화면에 임시 추가했어요.`,
+    );
   }
 }
 
@@ -1713,12 +2012,18 @@ async function createTagOnServer(name) {
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       console.warn('태그 서버 등록 실패:', res.status, body.code || '');
-      return { ok: false, status: res.status, code: body.code || '', data: null };
+      return {
+        ok: false,
+        status: res.status,
+        code: body.code || '',
+        data: null,
+      };
     }
     const data = body.data || null; // { tagId, name }
     if (data && data.name) {
       serverTagMap[data.name.replace(/\s/g, '')] = data.tagId;
-      if (!serverTags.some((t) => t.tagId === data.tagId)) serverTags.push(data);
+      if (!serverTags.some((t) => t.tagId === data.tagId))
+        serverTags.push(data);
     }
     return { ok: true, status: res.status, code: body.code || '', data };
   } catch (e) {
@@ -1787,7 +2092,12 @@ function submitTagByName(rawName) {
     clickTagOnServer(prof.id, existing.tagId || serverTagId);
   } else {
     const baselineMax = Math.max(10, ...prof.allTags.map((t) => t.max || 10));
-    prof.allTags.push({ name: tagName, count: 1, max: baselineMax, tagId: serverTagId });
+    prof.allTags.push({
+      name: tagName,
+      count: 1,
+      max: baselineMax,
+      tagId: serverTagId,
+    });
     clickTagOnServer(prof.id, serverTagId);
   }
 
@@ -1810,7 +2120,8 @@ function updateTagButtonState() {
 
   // 새 태그 생성 UI는 관리자(admin)로 로그인했을 때만 노출한다.
   const adminCreate = document.getElementById('admin-tag-create');
-  if (adminCreate) adminCreate.classList.toggle('hidden', !(isLoggedIn && isAdmin));
+  if (adminCreate)
+    adminCreate.classList.toggle('hidden', !(isLoggedIn && isAdmin));
 
   // 비로그인 상태: '기여 완료' 등 로그인 사용자용 문구가 남지 않도록 초기화한다.
   if (!isLoggedIn) {
@@ -1886,7 +2197,11 @@ function renderDiagram(prof) {
   setBar('bar-fill-workload', 'num-workload', m.workload);
 
   const total =
-    (m.examDifficulty + m.gradeDifficulty + m.attendanceDifficulty + m.workload) / 4;
+    (m.examDifficulty +
+      m.gradeDifficulty +
+      m.attendanceDifficulty +
+      m.workload) /
+    4;
   document.getElementById('diagram-total-num').innerText =
     `${total.toFixed(1)} / 5.0`;
 
@@ -1916,7 +2231,8 @@ function renderRadarChart(axes) {
     const angle = -Math.PI / 2 + i * ((2 * Math.PI) / axes.length);
     return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
   };
-  const toStr = (pts) => pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const toStr = (pts) =>
+    pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
   const make = (tag, attrs, cls) => {
     const el = document.createElementNS(NS, tag);
     if (cls) el.setAttribute('class', cls);
@@ -1930,7 +2246,11 @@ function renderRadarChart(axes) {
   for (let lvl = 1; lvl <= levels; lvl++) {
     const r = (maxR / levels) * lvl;
     svg.appendChild(
-      make('polygon', { points: toStr(axes.map((_, i) => pointFor(i, r))) }, 'radar-grid'),
+      make(
+        'polygon',
+        { points: toStr(axes.map((_, i) => pointFor(i, r))) },
+        'radar-grid',
+      ),
     );
     const tick = make('text', { x: cx + 6, y: cy - r + 3 }, 'radar-tick');
     tick.textContent = lvl;
@@ -1940,13 +2260,19 @@ function renderRadarChart(axes) {
   // 중심에서 각 축으로 뻗는 선
   axes.forEach((_, i) => {
     const p = pointFor(i, maxR);
-    svg.appendChild(make('line', { x1: cx, y1: cy, x2: p.x, y2: p.y }, 'radar-spoke'));
+    svg.appendChild(
+      make('line', { x1: cx, y1: cy, x2: p.x, y2: p.y }, 'radar-spoke'),
+    );
   });
 
   // 데이터 영역
-  const dataPts = axes.map((a, i) => pointFor(i, (maxR / levels) * Math.max(0, Math.min(5, a.value))));
+  const dataPts = axes.map((a, i) =>
+    pointFor(i, (maxR / levels) * Math.max(0, Math.min(5, a.value))),
+  );
   svg.appendChild(make('polygon', { points: toStr(dataPts) }, 'radar-area'));
-  dataPts.forEach((p) => svg.appendChild(make('circle', { cx: p.x, cy: p.y, r: 4 }, 'radar-dot')));
+  dataPts.forEach((p) =>
+    svg.appendChild(make('circle', { cx: p.x, cy: p.y, r: 4 }, 'radar-dot')),
+  );
 
   // 축 라벨
   axes.forEach((a, i) => {
@@ -1997,8 +2323,12 @@ function renderDetailPage(profId) {
 
   document.querySelector('.current-dept').innerText = prof.dept;
   document.getElementById('detail-prof-name').innerText = prof.name;
-  document.getElementById('detail-prof-dept').innerText =
-    [prof.college, prof.dept].filter(Boolean).join(' ');
+  document.getElementById('detail-prof-dept').innerText = [
+    prof.college,
+    prof.dept,
+  ]
+    .filter(Boolean)
+    .join(' ');
   // 담당 과목이 있으면 표시, 없으면 '· 담당 과목' 문구째로 숨김
   const subjWrap = document.getElementById('detail-subjects-wrap');
   if (prof.subjects && prof.subjects.length > 0) {
@@ -2076,7 +2406,10 @@ async function fetchReviewsFromServer(professorId) {
 
     // 담당 과목 표시도 위 과목명으로 유추해 채운다
     const derivedSubjects = prof.subjectOptions.map((s) => s.name);
-    if (derivedSubjects.length && (!prof.subjects || prof.subjects.length === 0))
+    if (
+      derivedSubjects.length &&
+      (!prof.subjects || prof.subjects.length === 0)
+    )
       prof.subjects = derivedSubjects;
 
     // 지금 이 교수 화면을 보고 있다면 다시 그림
@@ -2123,10 +2456,16 @@ async function createReviewOnServer(professorId, subjectId, content) {
       const err = await res.json().catch(() => ({}));
       const code = err.code || '';
       console.warn('리뷰 서버 작성 실패:', res.status, code, err.message || '');
-      if (code === 'SUBJECT_PROFESSOR_MISMATCH') {
+      if (code === 'REVIEW_409_1' || res.status === 409) {
+        alert(
+          '이미 이 과목에 리뷰를 작성했어요. (같은 과목은 1번만 작성 가능)',
+        );
+      } else if (code === 'SUBJECT_PROFESSOR_MISMATCH') {
         alert(
           '선택한 과목이 이 교수님의 담당 과목이 아니에요.\n과목을 다시 선택해 주세요. (리뷰는 화면에는 반영됩니다)',
         );
+      } else if (res.status === 401) {
+        alert('세션이 만료됐어요. 다시 로그인 후 작성해 주세요.');
       } else if (err.message) {
         console.warn('서버 메시지:', err.message);
       }
@@ -2209,7 +2548,7 @@ function renderDashboard() {
   if (greetEl) {
     greetEl.innerText = isLoggedIn
       ? `${userNickname}님, 반가워요 👋`
-      : '강의라운지에 오신 걸 환영해요 👋';
+      : '전공위키에 오신 걸 환영해요 👋';
   }
 
   const listEl = document.getElementById('dash-popular-list');
@@ -2326,7 +2665,9 @@ function populateJokboSubjectSelect(profId) {
       ? '과목 선택 또는 직접 입력'
       : '담당 과목을 직접 입력하세요';
   if (dl)
-    dl.innerHTML = subjects.map((s) => `<option value="${s}"></option>`).join('');
+    dl.innerHTML = subjects
+      .map((s) => `<option value="${s}"></option>`)
+      .join('');
 }
 
 document.getElementById('jk-prof').addEventListener('change', (e) => {
@@ -2352,12 +2693,12 @@ document.getElementById('menu-dashboard').addEventListener('click', () => {
   );
   renderDashboard();
 });
-document.getElementById('dash-go-search').addEventListener('click', () =>
-  dashNavigate('search'),
-);
-document.getElementById('dash-more-prof').addEventListener('click', () =>
-  dashNavigate('search'),
-);
+document
+  .getElementById('dash-go-search')
+  .addEventListener('click', () => dashNavigate('search'));
+document
+  .getElementById('dash-more-prof')
+  .addEventListener('click', () => dashNavigate('search'));
 document.querySelectorAll('.dash-quick-card').forEach((card) => {
   card.addEventListener('click', () =>
     dashNavigate(card.getAttribute('data-go')),
@@ -2476,7 +2817,27 @@ document.body.addEventListener('click', (e) => {
 });
 
 // 로그아웃 처리 (헤더 버튼 / 마이페이지 네비 버튼 공용)
-function performLogout() {
+// [API 연동] 로그아웃 (POST /api/auth/logout, 인증 필요)
+//  성공 200 USER_200_2 → 서버 refreshToken 삭제 + 쿠키 만료
+//  실패 401 AUTH_401_001/002/003 (토큰 없음/만료/유효하지않음)
+//  실패해도 로컬 로그아웃은 그대로 진행한다.
+async function logoutOnServer() {
+  if (!getToken()) return;
+  try {
+    // credentials:'include'는 프록시가 Allow-Credentials를 안 줘서 CORS로 막힘 → 제거.
+    // Bearer 토큰만으로 서버가 사용자를 식별해 로그아웃 처리한다.
+    const res = await authFetch(`${API_BASE}/api/auth/logout`, {
+      method: 'POST',
+    });
+    if (res.ok) console.info('서버 로그아웃 성공(토큰 무효화).');
+    else console.warn('서버 로그아웃 실패:', res.status);
+  } catch (e) {
+    console.warn('서버 로그아웃 연결 실패(로컬 로그아웃은 진행):', e);
+  }
+}
+
+async function performLogout() {
+  await logoutOnServer(); // 토큰이 지워지기 전에 서버에 로그아웃 요청
   isLoggedIn = false;
   isCertified = false;
   isAdmin = false;
@@ -2628,12 +2989,14 @@ function renderMemberDetail(email) {
 }
 
 // 신고 모달 이벤트
-document.getElementById('report-reason-chips').addEventListener('click', (e) => {
-  const chip = e.target.closest('.report-reason-chip');
-  if (!chip) return;
-  const input = document.getElementById('report-reason-input');
-  if (input) input.value = chip.getAttribute('data-reason');
-});
+document
+  .getElementById('report-reason-chips')
+  .addEventListener('click', (e) => {
+    const chip = e.target.closest('.report-reason-chip');
+    if (!chip) return;
+    const input = document.getElementById('report-reason-input');
+    if (input) input.value = chip.getAttribute('data-reason');
+  });
 document
   .getElementById('btn-submit-report')
   .addEventListener('click', submitReport);
@@ -2664,7 +3027,9 @@ document.getElementById('admin-member-list').addEventListener('click', (e) => {
 });
 // 관리자 모달 탭 버튼 (회원 목록 / 신고된 리뷰)
 document.querySelectorAll('.admin-tab').forEach((b) => {
-  b.addEventListener('click', () => switchAdminTab(b.getAttribute('data-atab')));
+  b.addEventListener('click', () =>
+    switchAdminTab(b.getAttribute('data-atab')),
+  );
 });
 // 배경(딤) 클릭 시 관리자 모달 닫기
 ['admin-modal', 'member-detail-modal'].forEach((id) => {
@@ -2704,9 +3069,11 @@ document.getElementById('star-input-group').addEventListener('click', (e) => {
   }
 });
 
-document.getElementById('mp-history-more-link').addEventListener('click', () => {
-  switchMypageTab('history');
-});
+document
+  .getElementById('mp-history-more-link')
+  .addEventListener('click', () => {
+    switchMypageTab('history');
+  });
 
 // ============================================================
 // 📱 모바일 사이드바 슬라이드 메뉴 (햄버거 버튼)
@@ -2747,12 +3114,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const savedEmail = getCurrentUserEmail();
   if (savedEmail && loadUserIntoSession(savedEmail)) {
     // 저장된 세션 복원 완료
+    fetchMyInfo(); // 서버 기준 프로필 반영
+    fetchMyPointHistory(); // 복원된 세션의 서버 포인트 반영
   }
   updateAuthUI();
-  renderProfessorList();       // 먼저 로컬/시드 데이터로 즉시 표시
-  renderDashboard();           // 대시보드 홈(기본 진입 화면) 채우기
-  loadProfessorsFromServer();  // 서버 연결되면 실제 교수 목록으로 교체
-  fetchTagsFromServer();       // 전역 태그 목록(이름→tagId) 미리 로드
+  renderProfessorList(); // 먼저 로컬/시드 데이터로 즉시 표시
+  renderDashboard(); // 대시보드 홈(기본 진입 화면) 채우기
+  loadProfessorsFromServer(); // 서버 연결되면 실제 교수 목록으로 교체
+  fetchTagsFromServer(); // 전역 태그 목록(이름→tagId) 미리 로드
 });
 
 // ============================================================
@@ -2765,12 +3134,16 @@ function detectDialogType(msg) {
   // 이모지 정규식엔 반드시 u 플래그를 붙인다. u가 없으면 📝·🎁 등이
   // 🔒과 같은 서로게이트 코드(\uD83D)를 공유해 오류로 잘못 분류된다.
   if (
-    /(성공|완료|환영|적립|등록되었|등록했|축하|구매했|되었습니다|저장되었|삭제되었|수정되었)/.test(m) ||
+    /(성공|완료|환영|적립|등록되었|등록했|축하|구매했|되었습니다|저장되었|삭제되었|수정되었)/.test(
+      m,
+    ) ||
     /[🎉✅🎁📝🏷🔑✨🎊]/u.test(m)
   )
     return 'success';
   if (
-    /(실패|오류|올바르지|부족합니다|없습니다|불가|취소되었|에러|권한이 없|만료)/.test(m) ||
+    /(실패|오류|올바르지|부족합니다|없습니다|불가|취소되었|에러|권한이 없|만료)/.test(
+      m,
+    ) ||
     /[❌🔒]/u.test(m)
   )
     return 'error';
