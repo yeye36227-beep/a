@@ -14,7 +14,9 @@
 // Live Server(5500)로 열면 CORS 프록시(8082)를 거쳐 백엔드를 호출하고,
 // 도커 프론트(8080) 등 그 외 환경에서는 백엔드(8081)를 직접 호출한다.
 const API_BASE =
-  location.port === '5500' ? 'http://localhost:8082' : 'http://localhost:8081';
+  location.port === '5500'
+    ? 'http://localhost:8082'
+    : 'https://department-wiki.duckdns.org';
 
 // ============================================================
 // [API 연동] JWT 토큰 처리 도구
