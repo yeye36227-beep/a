@@ -985,78 +985,114 @@ body {
 }
 .jokbo-card {
   background: #fff;
-  border-radius: 12px;
-  padding: 14px 16px;
+  border-radius: 14px;
+  padding: 18px;
   border: 1px solid var(--border-color);
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 8px;
   height: fit-content;
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+.jokbo-card:hover {
+  border-color: #d0d7ff;
+  box-shadow: 0 4px 14px rgba(76, 110, 245, 0.08);
+}
+.jokbo-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .jokbo-badge {
   background: #fff0f6;
   color: #d6336c;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 3px 6px;
-  border-radius: 4px;
-  margin-bottom: 4px;
+  padding: 3px 9px;
+  border-radius: 20px;
   display: inline-block;
+}
+.jokbo-owned-pill {
+  background: #ebfbee;
+  color: #2b8a3e;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
 }
 .jokbo-title-text {
   font-size: 15px;
   font-weight: 700;
-  margin-bottom: 2px;
+  line-height: 1.35;
+  color: var(--text-main);
 }
 .jokbo-meta {
   font-size: 12px;
   color: var(--text-muted);
 }
-.jokbo-registrant {
-  font-size: 11px;
+.jokbo-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+.jokbo-price {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.jokbo-price strong {
   color: var(--primary-color);
-  font-weight: 600;
-  margin-top: 4px;
+  font-size: 15px;
+  margin-left: 2px;
 }
 .jokbo-buy-btn {
   background: var(--primary-color);
   color: #fff;
   border: none;
-  padding: 8px 14px;
-  border-radius: 6px;
+  padding: 9px 18px;
+  border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
+  transition:
+    background-color 0.15s ease,
+    transform 0.1s ease;
+}
+.jokbo-buy-btn:hover {
+  background: #4263eb;
+}
+.jokbo-buy-btn:active {
+  transform: scale(0.97);
 }
 .jokbo-buy-btn.owned {
-  background: #e9ecef;
-  color: #868e96;
-  cursor: default;
+  background: #f1f3f5;
+  color: #495057;
 }
-.jokbo-card-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  flex-shrink: 0;
+.jokbo-buy-btn.owned:hover {
+  background: #e9ecef;
 }
 .jokbo-delete-btn {
+  margin-left: auto;
   background: none;
-  border: 1px solid #ffc9c9;
-  color: #e5484d;
-  padding: 5px 10px;
+  border: none;
+  color: #adb5bd;
+  padding: 2px;
   border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: color 0.15s ease;
+}
+.jokbo-delete-btn:hover {
+  color: #e5484d;
 }
 .jokbo-delete-btn span.material-icons-outlined {
-  font-size: 15px;
+  font-size: 18px;
 }
 .jokbo-delete-btn:hover {
   background: #fff5f5;
@@ -2453,4 +2489,64 @@ body {
 }
 .admin-tag-create-row button:active {
   transform: scale(0.96);
+}
+
+/* 관리자 모달 - 탭 & 신고 리뷰 목록 */
+.admin-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.admin-tab {
+  flex: 1;
+  padding: 9px 0;
+  border: 1px solid var(--border-color, #e9ecef);
+  border-radius: 8px;
+  background: #fff;
+  color: #495057;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.admin-tab.active {
+  background: var(--primary-color, #4c6ef5);
+  border-color: var(--primary-color, #4c6ef5);
+  color: #fff;
+}
+.admin-tab-desc {
+  font-size: 12px;
+  color: var(--text-muted, #868e96);
+  margin-bottom: 12px;
+  text-align: center;
+}
+.report-card {
+  border: 1px solid var(--border-color, #e9ecef);
+  border-left: 3px solid #fa5252;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.report-card .rc-reason {
+  font-weight: 700;
+  font-size: 13px;
+  color: #e03131;
+  margin-bottom: 4px;
+}
+.report-card .rc-review {
+  font-size: 13px;
+  color: var(--text-main, #212529);
+  background: #f8f9fa;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 6px 0;
+}
+.report-card .rc-meta {
+  font-size: 11px;
+  color: var(--text-muted, #868e96);
+}
+.report-empty {
+  text-align: center;
+  padding: 30px;
+  color: var(--text-muted, #868e96);
+  font-size: 13px;
 }

@@ -537,7 +537,7 @@
                     color: var(--text-muted);
                     font-weight: normal;
                   "
-                  >(모든 족보 균일가 10P)</span
+                  >(열람 10P · 재열람 무료)</span
                 >
               </h2>
             </div>
@@ -654,7 +654,7 @@
                     <h3>📥 내가 가진 족보</h3>
                     <ul class="purchased-list" id="point-jokbo-list">
                       <li class="empty-msg">
-                        아직 구매하거나 등록한 족보가 없습니다.
+                        아직 열람하거나 등록한 족보가 없습니다.
                       </li>
                     </ul>
                   </div>
@@ -676,7 +676,7 @@
                     <h3>📥 내가 가진 족보 (보관함)</h3>
                     <ul class="purchased-list" id="purchased-jokbo-list">
                       <li class="empty-msg">
-                        아직 구매하거나 등록한 족보가 없습니다.
+                        아직 열람하거나 등록한 족보가 없습니다.
                       </li>
                     </ul>
                   </div>
@@ -969,20 +969,30 @@
           >
           관리자 페이지
         </h2>
-        <p
-          style="
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-bottom: 14px;
-            text-align: center;
-          "
-        >
-          가입 회원 목록입니다. 상세보기를 눌러 회원 정보를 확인하세요.
-        </p>
-        <div
-          id="admin-member-list"
-          style="max-height: 380px; overflow-y: auto"
-        ></div>
+        <div class="admin-tabs">
+          <button class="admin-tab active" data-atab="members">회원 목록</button>
+          <button class="admin-tab" data-atab="reports">신고된 리뷰</button>
+        </div>
+
+        <div id="admin-tab-members">
+          <p class="admin-tab-desc">
+            가입 회원 목록입니다. 상세보기를 눌러 회원 정보를 확인하세요.
+          </p>
+          <div
+            id="admin-member-list"
+            style="max-height: 360px; overflow-y: auto"
+          ></div>
+        </div>
+
+        <div id="admin-tab-reports" class="hidden">
+          <p class="admin-tab-desc">
+            신고 접수된 리뷰와 사유입니다. 내용을 확인하고 조치하세요.
+          </p>
+          <div
+            id="admin-report-list"
+            style="max-height: 360px; overflow-y: auto"
+          ></div>
+        </div>
       </div>
     </div>
 

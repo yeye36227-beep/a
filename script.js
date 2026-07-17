@@ -302,100 +302,7 @@ function addPointHistory(label, delta) {
 // ============================================================
 // 기본(시드) 데이터 - localStorage에 아무것도 없을 때만 사용됨
 // ============================================================
-const DEFAULT_PROFESSORS = [
-  {
-    id: 1,
-    name: '김을지 교수님',
-    college: '보건과학대학',
-    dept: '물리치료학과',
-    rating: 4.6,
-    reviewCount: 3,
-    grade: '1',
-    tags: ['시험 핵심위주', '학점 깔끔', '출결 엄격'],
-    subjects: ['온열치방학', '재활운동학'],
-    // 다이어그램 탭 4대 핵심 지표 (1~5 척도) - 리뷰가 새로 등록될 때마다 가중평균으로 갱신됨
-    diagramMetrics: {
-      examDifficulty: 4.2,
-      gradeDifficulty: 3.8,
-      attendanceDifficulty: 4.5,
-      workload: 3.1,
-      sampleCount: 3,
-    },
-    allTags: [
-      { name: '시험난이도 높음', count: 68, max: 80 },
-      { name: '과제 많음', count: 54, max: 80 },
-      { name: '출결 간소화', count: 22, max: 80 },
-    ],
-    reviews: [
-      {
-        id: 101,
-        writer: '익명 수강생',
-        rating: 5,
-        semester: '2024-1',
-        text: '수업 내용을 이해하기 쉽게 설명해주셔서 좋았어요. 과제도 적절한 수준이었습니다!',
-        date: '2024.05.12',
-        timestamp: new Date('2024-05-12').getTime(),
-      },
-      {
-        id: 102,
-        writer: '익명 수강생',
-        rating: 4,
-        semester: '2024-1',
-        text: '자료를 잘 제공해주셔서 시험 공부하기 편했어요. 시험 난이도는 중간 정도!',
-        date: '2024.04.28',
-        timestamp: new Date('2024-04-28').getTime(),
-      },
-      {
-        id: 103,
-        writer: '익명 수강생',
-        rating: 5,
-        semester: '2023-2',
-        text: '피드백이 빨라서 질문하기 좋았습니다. 유쾌하셔서 수업 분위기도 좋아요!',
-        date: '2023.03.15',
-        timestamp: new Date('2023-03-15').getTime(),
-      },
-    ],
-  },
-  {
-    id: 2,
-    name: '박라운지 교수님',
-    college: '보건과학대학',
-    dept: '임상병리학과',
-    rating: 4.5,
-    reviewCount: 2,
-    grade: '2',
-    tags: ['과제 없음', '출결 프리'],
-    subjects: ['기초임상학', '실습'],
-    diagramMetrics: {
-      examDifficulty: 2.5,
-      gradeDifficulty: 4.6,
-      attendanceDifficulty: 1.8,
-      workload: 1.5,
-      sampleCount: 2,
-    },
-    allTags: [{ name: '학점 혜자', count: 30, max: 50 }],
-    reviews: [
-      {
-        id: 201,
-        writer: '익명 수강생',
-        rating: 5,
-        semester: '2024-2',
-        text: '과제 부담이 거의 없어서 다른 전공 공부에 집중하기 좋았어요.',
-        date: '2024.06.02',
-        timestamp: new Date('2024-06-02').getTime(),
-      },
-      {
-        id: 202,
-        writer: '익명 수강생',
-        rating: 4,
-        semester: '2024-1',
-        text: '출결이 자유로운 편이고 학점도 잘 주시는 편이었습니다.',
-        date: '2024.04.10',
-        timestamp: new Date('2024-04-10').getTime(),
-      },
-    ],
-  },
-];
+const DEFAULT_PROFESSORS = []; // 하드코딩 제거 - 교수는 전적으로 서버(GET /api/professors)에서 로드
 
 // 기본 예시 족보는 제거함(내용 없는 껍데기라 삭제). 상점은 사용자·서버 등록 족보로 채워진다.
 const DEFAULT_JOKBO = [];
@@ -431,15 +338,18 @@ async function loadProfessorsFromServer() {
       const prev = prevById[p.professorId];
       return {
         id: p.professorId,
-        name: p.name, // 서버가 준 최신 이름/학과로 갱신
+        name: p.name, // 서버가 준 이름/학과가 기준
         departmentId: p.departmentId,
-        dept: p.departmentName || (prev ? prev.dept : ''),
-        college: prev ? prev.college : '',
+        dept: p.departmentName || '',
+        // 서버가 안 주는 하드코딩 전용 필드(대학/학년/카드태그)는 쓰지 않는다 → 모든 교수 통일
+        college: '',
+        grade: '',
+        tags: [],
+        // 아래는 서버 리뷰에서 파생/계산되는 값 → 있으면 유지, 없으면 기본값
         rating: prev ? prev.rating : 0,
         reviewCount: prev ? prev.reviewCount : 0,
-        grade: prev ? prev.grade : '',
-        tags: prev ? prev.tags : [],
         subjects: prev ? prev.subjects : [],
+        subjectOptions: prev ? prev.subjectOptions : [],
         diagramMetrics: prev
           ? prev.diagramMetrics
           : {
@@ -449,8 +359,8 @@ async function loadProfessorsFromServer() {
               workload: 0,
               sampleCount: 0,
             },
-        allTags: prev ? prev.allTags : [],
-        reviews: prev ? prev.reviews : [], // 로컬 리뷰 보존
+        allTags: prev ? prev.allTags || [] : [],
+        reviews: prev ? prev.reviews || [] : [],
       };
     });
 
@@ -566,21 +476,22 @@ function renderJokboStore() {
       const canDelete = isLoggedIn && item.registeredBy === userNickname;
       return `
       <div class="jokbo-card">
-        <div>
+        <div class="jokbo-card-head">
           <span class="jokbo-badge">${item.profName}</span>
-          <div class="jokbo-title-text">${item.subject}</div>
-          <div class="jokbo-meta">유형: ${item.type} · 가격: <strong style="color:var(--primary-color);">${item.price} P</strong></div>
-          <div class="jokbo-registrant">${registrantText}</div>
-        </div>
-        <div class="jokbo-card-actions">
-          <button class="jokbo-buy-btn ${isOwned ? 'owned' : ''}" data-id="${item.id}" ${isOwned ? 'disabled' : ''}>
-            ${isOwned ? '보유 완료' : '족보 구매'}
-          </button>
+          ${isOwned ? '<span class="jokbo-owned-pill">열람함</span>' : ''}
           ${
             canDelete
-              ? `<button class="jokbo-delete-btn" data-del="${item.id}"><span class="material-icons-outlined">delete</span> 삭제</button>`
+              ? `<button class="jokbo-delete-btn" data-del="${item.id}" title="삭제"><span class="material-icons-outlined">delete</span></button>`
               : ''
           }
+        </div>
+        <div class="jokbo-title-text">${item.subject}</div>
+        <div class="jokbo-meta">${item.type} · ${registrantText}</div>
+        <div class="jokbo-card-footer">
+          <span class="jokbo-price">열람 <strong>10P</strong></span>
+          <button class="jokbo-buy-btn ${isOwned ? 'owned' : ''}" data-id="${item.id}">
+            ${isOwned ? '다시 열람' : '열람하기'}
+          </button>
         </div>
       </div>
     `;
@@ -589,37 +500,37 @@ function renderJokboStore() {
 }
 
 document.body.addEventListener('click', (e) => {
-  if (
-    e.target.classList.contains('jokbo-buy-btn') &&
-    !e.target.classList.contains('owned')
-  ) {
+  // 족보 '열람' (명세: 최초 열람 시 -10P, 재열람 무료)
+  const viewBtn = e.target.closest('.jokbo-buy-btn');
+  if (viewBtn) {
     if (!isLoggedIn) {
-      alert('족보 구매는 로그인이 필요합니다.');
+      alert('족보 열람은 로그인이 필요합니다.');
       openAuthModal('login');
       return;
     }
 
-    const jokboId = Number(e.target.getAttribute('data-id'));
+    const jokboId = Number(viewBtn.getAttribute('data-id'));
     const item = jokboStoreData.find((j) => j.id === jokboId);
+    if (!item) return;
 
-    if (item) {
-      if (userPoints < item.price) {
+    const alreadyUnlocked = purchasedJokbo.some((p) => p.id === jokboId);
+    if (!alreadyUnlocked) {
+      // 최초 열람 → 10P 차감 (서버도 GET content 시 최초 1회 -10P 차감)
+      if (userPoints < 10) {
         alert(
-          `포인트가 부족합니다! (현재 보유: ${userPoints}P / 필요: ${item.price}P)\n리뷰 작성이나 태그 기여로 포인트를 획득하세요.`,
+          `포인트가 부족해 열람할 수 없어요. (열람 10P 필요 / 현재 ${userPoints}P)\n리뷰 작성이나 태그 기여로 포인트를 모아보세요.`,
         );
         return;
       }
-
-      userPoints -= item.price;
+      userPoints -= 10;
       purchasedJokbo.push(item);
-      addPointHistory(`${item.subject} 구매 차감`, -item.price);
-      alert(
-        `🎁 [${item.subject}]를 성공적으로 구매했습니다. 10포인트가 차감되었습니다.`,
-      );
-
+      addPointHistory(`${item.subject} 열람 차감`, -10);
       updateAuthUI();
       renderJokboStore();
     }
+    // 열람 모달 열기 (+ 서버 content 조회). 재열람은 무료.
+    viewJokboContentById(jokboId);
+    return;
   }
 
   // 족보 삭제 (내가 등록한 족보만)
@@ -786,7 +697,7 @@ function renderPurchasedJokboList() {
 
   const html =
     purchasedJokbo.length === 0
-      ? `<li class="empty-msg">아직 구매하거나 등록한 족보가 없습니다. 상점에서 교환해 보세요!</li>`
+      ? `<li class="empty-msg">아직 열람하거나 등록한 족보가 없습니다. 상점에서 열람해 보세요!</li>`
       : purchasedJokbo
           .map(
             (item) => `
@@ -868,6 +779,16 @@ async function fetchExamArchivesForProfessor(professorId) {
   }
 }
 
+// 족보 상점 진입 시: 모든 교수의 서버 족보를 불러와 상점에 채운다.
+// (서버 족보는 교수 상세를 안 들러도 상점에서 바로 보이고, 열람 시 content API가 호출되게)
+async function loadAllExamArchivesForStore() {
+  if (!Array.isArray(professorsData) || professorsData.length === 0) return;
+  await Promise.all(
+    professorsData.map((p) => fetchExamArchivesForProfessor(p.id)),
+  );
+  renderJokboStore();
+}
+
 // ============================================================
 // [API 연동] 족보(기출자료) 신규 등록  ★엔드포인트는 추정 — 명세서로 확인 필요★
 //  추정: POST /api/professors/{professorId}/exam-archives
@@ -906,8 +827,9 @@ async function createExamArchiveOnServer(professorId, title, content, writerSeme
 //  성공 200 EXAM_ARCHIVE_200_2 → 최초 열람 시 서버가 포인트 -10 차감, 재열람은 무차감.
 //  실패 401 COMMON_401(인증) / 402 EXAM_ARCHIVE_402(포인트 부족) / 404 EXAM_ARCHIVE_404(없음)
 async function fetchExamArchiveContent(archiveId) {
-  if (!canSyncToServer()) {
-    console.info('토큰 없음/만료 → 족보 서버 열람 생략(로컬 내용 표시)');
+  // 로그인(토큰)이 아예 없으면 서버 열람 불가. 만료 토큰은 그대로 호출해 401 안내를 받는다.
+  if (!getToken()) {
+    alert('족보 열람은 로그인이 필요해요.');
     return;
   }
   try {
@@ -1224,7 +1146,6 @@ function renderProfessorList() {
           <h3>${prof.name}</h3>
           <div class="dept-text">${[prof.college, prof.dept].filter(Boolean).join(' ')}${prof.grade ? ` · ${prof.grade}학년 대상` : ''}</div>
           ${safeSubjects.length ? `<div class="card-subjects">담당과목: ${safeSubjects.join(', ')}</div>` : ''}
-          <div class="card-tags">${safeTags.map((t) => `<span class="tag-badge">${t}</span>`).join('')}</div>
           <div class="card-rating"><span class="material-icons-outlined">star</span> ${safeRating.toFixed(1)} (${safeReviews.length}개 리뷰)</div>
         </div>
       </div>
@@ -1332,36 +1253,60 @@ function submitReport() {
   reportingReviewId = null;
 }
 
+// 명세: POST /api/reviews/{reviewId}/reports (인증 필요)
+//  성공 200 REVIEW_200_2 (data null)
+//  실패 400 COMMON_400(사유 누락) / 401 COMMON_401(인증) / 404 REVIEW_404(없는 리뷰) / 409 REVIEW_409_2(이미 신고)
 async function reportReviewOnServer(reviewId, reason) {
-  // 프론트에서 항상 접수 내역을 남긴다 (백엔드 미연동/실패 시에도 접수 보장)
+  // 프론트에서 항상 접수 내역을 남긴다 (백엔드 미연동/실패 시에도 접수 보관)
   addReportLog({
     reviewId,
     reason,
     reporter: currentUserEmail || userNickname || '익명',
     at: new Date().toISOString(),
   });
-  // 로컬에서 작성한 리뷰(id가 타임스탬프)는 서버에 없으므로 서버 신고 시 404가 난다.
-  // 서버에 저장된 리뷰(fromServer)일 때만 서버로 신고를 보낸다.
+
+  // 로컬에서 작성한 리뷰(id가 타임스탬프)는 서버에 없으므로 서버 신고 대상이 아니다.
   const isServerReview = professorsData.some((p) =>
     (p.reviews || []).some((r) => r.id === reviewId && r.fromServer),
   );
-  // 토큰이 없거나 만료면 서버 호출은 생략(로컬 접수는 이미 완료). 401 방지.
-  if (isServerReview && canSyncToServer()) {
-    try {
-      const res = await authFetch(
-        `${API_BASE}/api/reviews/${reviewId}/reports`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason }),
-        },
-      );
-      if (!res.ok) console.warn('리뷰 신고 서버 반영 실패:', res.status);
-    } catch (e) {
-      console.warn('리뷰 신고 서버 연결 실패(로컬 접수됨):', e);
-    }
+
+  if (!isServerReview) {
+    alert('신고가 접수되었습니다. 감사합니다.\n검토 후 조치될 예정입니다.');
+    return;
   }
-  alert('신고가 접수되었습니다. 감사합니다.\n검토 후 조치될 예정입니다.');
+  if (!canSyncToServer()) {
+    alert(
+      '신고가 접수되었어요. (세션 만료로 서버 반영은 다시 로그인 후 처리됩니다)',
+    );
+    return;
+  }
+
+  try {
+    const res = await authFetch(`${API_BASE}/api/reviews/${reviewId}/reports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+    const body = await res.json().catch(() => ({}));
+    const code = body.code || '';
+    if (res.ok) {
+      alert('신고가 접수되었습니다. 감사합니다.\n검토 후 조치될 예정입니다.');
+    } else if (res.status === 409 || code === 'REVIEW_409_2') {
+      alert('이미 신고한 리뷰예요. (중복 신고는 불가합니다)');
+    } else if (res.status === 404 || code === 'REVIEW_404') {
+      alert('존재하지 않는 리뷰예요.');
+    } else if (res.status === 401 || code === 'COMMON_401') {
+      alert('신고는 로그인이 필요해요. 다시 로그인해 주세요.');
+    } else if (res.status === 400 || code === 'COMMON_400') {
+      alert('신고 사유를 입력해 주세요.');
+    } else {
+      console.warn('리뷰 신고 실패:', res.status, code);
+      alert('신고 처리에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    }
+  } catch (e) {
+    console.warn('리뷰 신고 서버 연결 실패(로컬 접수됨):', e);
+    alert('신고가 접수되었습니다. (서버 연결 실패, 화면에는 접수됨)');
+  }
 }
 
 // ============================================================
@@ -2312,6 +2257,7 @@ function dashNavigate(dest) {
       document.getElementById('menu-jokbo'),
     );
     renderJokboStore();
+    loadAllExamArchivesForStore();
   } else if (dest === 'mypage') {
     switchView(
       document.getElementById('view-mypage'),
@@ -2439,6 +2385,7 @@ document.getElementById('menu-jokbo').addEventListener('click', () => {
     document.getElementById('menu-jokbo'),
   );
   renderJokboStore();
+  loadAllExamArchivesForStore(); // 서버 족보를 상점에 불러오기
 });
 document.getElementById('menu-mypage').addEventListener('click', () => {
   switchView(
@@ -2566,8 +2513,62 @@ function openAdminModal() {
     alert('관리자만 접근할 수 있는 페이지입니다.');
     return;
   }
+  switchAdminTab('members'); // 열 때 회원 목록 탭으로
   renderAdminMemberList();
+  renderAdminReportList();
   document.getElementById('admin-modal').classList.remove('hidden');
+}
+
+// 관리자 모달 탭 전환 (회원 목록 / 신고된 리뷰)
+function switchAdminTab(tab) {
+  document.querySelectorAll('.admin-tab').forEach((b) => {
+    b.classList.toggle('active', b.getAttribute('data-atab') === tab);
+  });
+  document
+    .getElementById('admin-tab-members')
+    .classList.toggle('hidden', tab !== 'members');
+  document
+    .getElementById('admin-tab-reports')
+    .classList.toggle('hidden', tab !== 'reports');
+  if (tab === 'reports') renderAdminReportList();
+}
+
+// 신고된 리뷰 목록 렌더 (로컬 신고 접수 내역 기반)
+function renderAdminReportList() {
+  const container = document.getElementById('admin-report-list');
+  if (!container) return;
+  const reports = getReportsLog();
+
+  if (!reports.length) {
+    container.innerHTML =
+      '<div class="report-empty">접수된 신고가 없습니다.</div>';
+    return;
+  }
+
+  // reviewId로 실제 리뷰(작성자/내용)를 찾아 함께 보여준다.
+  const findReview = (id) => {
+    for (const p of professorsData) {
+      const r = (p.reviews || []).find((rv) => rv.id === id);
+      if (r) return { review: r, prof: p };
+    }
+    return null;
+  };
+
+  container.innerHTML = reports
+    .map((rep) => {
+      const found = findReview(rep.reviewId);
+      const reviewText = found
+        ? `${found.prof.name} · ${found.review.writer}: “${found.review.text}”`
+        : `리뷰 #${rep.reviewId} (본문 없음/서버 리뷰)`;
+      const when = (rep.at || '').slice(0, 10).replace(/-/g, '.');
+      return `
+      <div class="report-card">
+        <div class="rc-reason">🚩 ${rep.reason || '(사유 없음)'}</div>
+        <div class="rc-review">${reviewText}</div>
+        <div class="rc-meta">신고자: ${rep.reporter || '익명'}${when ? ' · ' + when : ''}</div>
+      </div>`;
+    })
+    .join('');
 }
 
 function renderAdminMemberList() {
@@ -2660,6 +2661,10 @@ document
 document.getElementById('admin-member-list').addEventListener('click', (e) => {
   const btn = e.target.closest('.admin-detail-btn');
   if (btn) renderMemberDetail(btn.getAttribute('data-email'));
+});
+// 관리자 모달 탭 버튼 (회원 목록 / 신고된 리뷰)
+document.querySelectorAll('.admin-tab').forEach((b) => {
+  b.addEventListener('click', () => switchAdminTab(b.getAttribute('data-atab')));
 });
 // 배경(딤) 클릭 시 관리자 모달 닫기
 ['admin-modal', 'member-detail-modal'].forEach((id) => {
