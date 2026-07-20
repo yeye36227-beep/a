@@ -13,10 +13,7 @@
 // ============================================================
 // Live Server(5500)로 열면 CORS 프록시(8082)를 거쳐 백엔드를 호출하고,
 // 도커 프론트(8080) 등 그 외 환경에서는 백엔드(8081)를 직접 호출한다.
-const API_BASE =
-  location.port === '5500'
-    ? 'http://localhost:8082'
-    : 'https://department-wiki.duckdns.org';
+const API_BASE = 'https://department-wiki.duckdns.org';
 
 // ============================================================
 // [API 연동] JWT 토큰 처리 도구
@@ -469,6 +466,7 @@ function renderJokboStore() {
   if (!container) return;
 
   container.innerHTML = jokboStoreData
+    .filter((item) => !item.deleted) // 소프트 삭제된 족보는 상점에서 숨김
     .map((item) => {
       const isOwned = purchasedJokbo.some((p) => p.id === item.id);
       const registrantText = item.registeredBy
@@ -515,8 +513,15 @@ document.body.addEventListener('click', (e) => {
     const item = jokboStoreData.find((j) => j.id === jokboId);
     if (!item) return;
 
-    const alreadyUnlocked = purchasedJokbo.some((p) => p.id === jokboId);
-    if (!alreadyUnlocked) {
+    // 내가 등록한 족보는 열람 무료(포인트 차감 없음). 등록자 == 현재 닉네임이면 소유자로 간주.
+    const isOwnJokbo = item.registeredBy && item.registeredBy === userNickname;
+    // 읽을 내용이 있는 족보인지 확인. 로컬 content가 있거나 서버 저장분(fromServer)이면 정상 족보.
+    // 내용 없는 '깡통' 족보(로컬 content 비어있고 서버 저장분도 아님)는 포인트를 차감하지 않는다.
+    const hasReadableContent =
+      item.fromServer || !!(item.content && item.content.trim());
+    const alreadyUnlocked =
+      isOwnJokbo || purchasedJokbo.some((p) => p.id === jokboId);
+    if (!alreadyUnlocked && hasReadableContent) {
       // 최초 열람 → 10P 차감 (서버도 GET content 시 최초 1회 -10P 차감)
       if (userPoints < 10) {
         alert(
@@ -546,7 +551,11 @@ document.body.addEventListener('click', (e) => {
       return;
     }
     if (!confirm(`'${item.subject}' 족보를 삭제할까요?`)) return;
-    jokboStoreData = jokboStoreData.filter((j) => j.id !== jokboId);
+    // 하드 삭제(배열에서 제거) 대신 소프트 삭제: deleted 플래그만 세운다.
+    // 이렇게 하면 서버 족보를 다시 불러와도 삭제 상태가 유지되고(부활 방지),
+    // 참조 무결성 문제로 인한 409(Conflict) 없이 목록에서만 숨길 수 있다.
+    item.deleted = true;
+    item.deletedAt = new Date().toISOString();
     purchasedJokbo = purchasedJokbo.filter((j) => j.id !== jokboId);
     saveJokboData();
     syncCurrentUserToStorage();

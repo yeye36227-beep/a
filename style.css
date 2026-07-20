@@ -1100,11 +1100,22 @@ body {
 }
 
 /* 👤 마이페이지 컴포넌트 */
+/* 마이페이지 콘텐츠 래퍼: page-view 높이를 그대로 채우는 flex 컬럼.
+   이게 있어야 아래 grid가 높이를 올바르게 물려받아 내부 패널이 스크롤된다. */
+.mypage-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
 .mypage-layout-grid {
   display: grid;
   grid-template-columns: 200px 1fr;
+  grid-template-rows: minmax(0, 1fr);
   gap: 24px;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 .mypage-aside-nav {
@@ -1140,8 +1151,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 6px;
+  padding-bottom: 24px;
 }
 .my-profile-section-clean {
   display: flex;
@@ -1566,9 +1579,16 @@ body {
     width: 100%;
   }
 
+  .mypage-wrapper {
+    flex: none;
+    min-height: 0;
+    overflow: visible;
+  }
   .mypage-layout-grid {
     grid-template-columns: 1fr;
-    height: auto;
+    grid-template-rows: auto;
+    flex: none;
+    min-height: 0;
     overflow: visible;
   }
   .mypage-aside-nav {

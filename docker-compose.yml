@@ -53,8 +53,12 @@ services:
       MYSQL_ROOT_PASSWORD: "rootpassword"
       MYSQL_DATABASE: "likelion"
       LANG: "C.UTF-8"
-    ports:
-      - "3306:3306"
+    # 백엔드는 도커 내부 네트워크에서 db:3306으로 접속하므로
+    # 호스트 포트(3306)를 밖으로 열 필요가 없다. (포트 충돌 방지)
+    # 호스트에서 직접 MySQL에 붙어야 할 때만 아래 두 줄의 주석을 풀되,
+    # 충돌 시 왼쪽 숫자를 3307 등으로 바꿔서 사용.
+    # ports:
+    #   - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql # 데이터 영속 저장(컨테이너 지워도 유지)
     healthcheck:
